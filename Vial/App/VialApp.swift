@@ -202,6 +202,7 @@ private struct VialTabsView: View {
     @State private var showsPlayer = false
     @State private var playerAttached = false
     @State private var miniPlayerFrame = CGRect.zero
+    @GestureState private var playerDrag: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var playerTransition
     private var miniArtwork = MiniPlayerArtworkSettings()
@@ -287,7 +288,7 @@ private struct VialTabsView: View {
     }
 
     private var playerAnimation: Animation? {
-        reduceMotion ? nil : .easeOut(duration: 0.3)
+        reduceMotion ? nil : .interpolatingSpring(duration: 0.3, bounce: 0, initialVelocity: 0)
     }
 
     private var playerOverlay: some View {
@@ -302,26 +303,63 @@ private struct VialTabsView: View {
                 height: viewport.size.height + insets.top + insets.bottom
             )
             let panel = showsPlayer ? full : compact
+            let shape = ConcentricRectangle(
+                corners: .concentric(minimum: .fixed(compact.height / 2)),
+                isUniform: true
+            )
 
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: showsPlayer ? 0 : compact.height / 2)
-                    .fill(.regularMaterial)
-                    .frame(width: panel.width, height: panel.height)
-                    .position(x: panel.midX, y: panel.midY)
+                LinearGradient(
+                    stops: (0...24).map { index in
+                        let position = Double(index) / 24
+                        let gray = (107 - 43 * position * position) / 255
+                        return Gradient.Stop(
+                            color: Color(red: gray, green: gray, blue: gray),
+                            location: CGFloat(position)
+                        )
+                    },
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .opacity(showsPlayer ? 1 : 0)
 
                 if showsPlayer {
-                    VialPlayerView(artworkNamespace: reduceMotion ? nil : playerTransition, dismiss: closePlayer)
+                    VialPlayerView(
+                        artworkNamespace: reduceMotion ? nil : playerTransition,
+                        dismiss: closePlayer
+                    )
+                        .frame(width: viewport.size.width, height: viewport.size.height)
+                        .offset(x: insets.leading, y: insets.top)
                         .environment(\.colorScheme, .dark)
                         .geometryGroup()
-                        .transition(.opacity)
+                        .transition(.identity)
                 } else {
                     miniPlayer(namespace: reduceMotion ? nil : playerTransition)
                         .frame(width: compact.width, height: compact.height)
                         .geometryGroup()
-                        .position(x: compact.midX, y: compact.midY)
                         .transition(.opacity)
                 }
             }
+            .frame(width: panel.width, height: panel.height, alignment: .topLeading)
+            .clipShape(shape)
+            .glassEffect(.regular, in: shape)
+            .position(x: panel.midX, y: panel.midY + (showsPlayer && !reduceMotion ? playerDrag : 0))
+            .animation(playerAnimation, value: playerDrag == 0)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 12, coordinateSpace: .global)
+                    .updating($playerDrag) { value, offset, transaction in
+                        guard showsPlayer, value.startLocation.y < viewport.frame(in: .global).midY,
+                              value.translation.height > abs(value.translation.width) else { return }
+                        transaction.disablesAnimations = true
+                        offset = value.translation.height
+                    }
+                    .onEnded { value in
+                        guard showsPlayer, value.startLocation.y < viewport.frame(in: .global).midY,
+                              value.translation.height > abs(value.translation.width),
+                              value.predictedEndTranslation.height > full.height / 2 else { return }
+                        closePlayer()
+                    }
+            )
             .frame(width: viewport.size.width, height: viewport.size.height)
             .accessibilityAddTraits(.isModal)
             .accessibilityAction(.escape, closePlayer)
@@ -434,33 +472,10 @@ private struct VialPlayerView: View {
             .padding(.bottom, spacing)
             .frame(maxWidth: .infinity)
             .frame(maxHeight: .infinity)
-            .background {
-                LinearGradient(
-                    stops: (0...24).map { index in
-                        let position = Double(index) / 24
-                        let gray = (107 - 43 * position * position) / 255
-                        return Gradient.Stop(
-                            color: Color(red: gray, green: gray, blue: gray),
-                            location: CGFloat(position)
-                        )
-                    },
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-            }
             .overlay(alignment: .top) { grabber }
         }
             .accessibilityAddTraits(.isModal)
             .contentShape(Rectangle())
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 12).onEnded { value in
-                    let movement = value.translation
-                    if !isAdjustingVolume && movement.height > 35 && movement.height > abs(movement.width) {
-                        dismiss()
-                    }
-                }
-            )
     }
 
     private var progressControls: some View {
