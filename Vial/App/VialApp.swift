@@ -233,16 +233,17 @@ private struct VialTabsView: View {
         }
         .allowsHitTesting(!playerAttached)
         .accessibilityHidden(playerAttached)
-        .overlay {
-            if playerAttached {
+        .background {
+            PlayerPresentationBridge(isPresented: $playerAttached) {
                 playerOverlay
-                    .transition(.identity)
                     .task {
                         await Task.yield()
                         guard !Task.isCancelled else { return }
                         withAnimation(playerAnimation) { showsPlayer = true }
                     }
             }
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
         }
         .onChange(of: preferences.visibleTabs) { _, tabs in
             if !tabs.contains(selection) { selection = tabs.first ?? .search }
@@ -352,6 +353,74 @@ private struct VialTabsView: View {
             var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true
             withTransaction(transaction) { playerAttached = false }
+        }
+    }
+}
+
+private struct PlayerPresentationBridge<Content: View>: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
+    @ViewBuilder var content: () -> Content
+
+    func makeUIViewController(context: Context) -> Presenter {
+        Presenter()
+    }
+
+    func updateUIViewController(_ presenter: Presenter, context: Context) {
+        presenter.requested = isPresented
+        if isPresented {
+            presenter.pendingContent = content()
+            presenter.onPresentationUnavailable = { isPresented = false }
+        }
+        presenter.scheduleUpdate()
+    }
+
+    final class Presenter: UIViewController {
+        var requested = false
+        var pendingContent: Content?
+        var onPresentationUnavailable: (() -> Void)?
+        private var host: UIHostingController<Content>?
+        private var updateScheduled = false
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            scheduleUpdate()
+        }
+
+        func scheduleUpdate() {
+            guard !updateScheduled else { return }
+            updateScheduled = true
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                updateScheduled = false
+                updatePresentation()
+            }
+        }
+
+        private func updatePresentation() {
+            guard requested else {
+                host?.dismiss(animated: false)
+                host = nil
+                pendingContent = nil
+                onPresentationUnavailable = nil
+                return
+            }
+            guard let content = pendingContent else { return }
+            if let host {
+                host.rootView = content
+                return
+            }
+            guard let window = viewIfLoaded?.window,
+                  let root = window.rootViewController else { return }
+            guard root.presentedViewController == nil else {
+                onPresentationUnavailable?()
+                return
+            }
+            let host = UIHostingController(rootView: content)
+            host.modalPresentationStyle = .overFullScreen
+            host.view.backgroundColor = .clear
+            host.view.accessibilityViewIsModal = true
+            self.host = host
+            root.present(host, animated: false)
         }
     }
 }
