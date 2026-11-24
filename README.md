@@ -1,7 +1,5 @@
 # Vial
 
-播放器移植自 [AppleMusicStylePlayer](https://github.com/f728743/AppleMusicStylePlayer/tree/a0b5631417dec05d092c3c61df4679ed361743bf)，包括迷你栏、全屏布局、共享封面过渡、拖拽和回弹、播放控制区及 Metal 动态背景。Vial 保留原生标签栏、系统音量和调试设置，不导入上游的示例播放数据。MIT 许可声明随应用打包，见 [AppleMusicStylePlayer-LICENSE.txt](Vial/App/AppleMusicStylePlayer-LICENSE.txt)。
-
 iOS 应用，Bundle Identifier：`com.aholic.vial`。最低支持 iOS 26.0，版本号由根目录 `VERSION` 管理。
 
 ## 导航

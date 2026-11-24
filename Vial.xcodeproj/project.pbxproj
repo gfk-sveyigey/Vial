@@ -6,33 +6,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A20000000000000000000000 /* Collection+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001; };
-		A20000000000000000000002 /* ColorPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003; };
-		A20000000000000000000004 /* ColorfulBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005; };
-		A20000000000000000000006 /* ColorfulBackgroundModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007; };
-		A20000000000000000000008 /* CompactNowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009; };
-		A20000000000000000000010 /* ExpandableNowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011; };
-		A20000000000000000000012 /* ForwardLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013; };
-		A20000000000000000000014 /* MarqueeText.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015; };
-		A20000000000000000000016 /* MulticolorGradient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017; };
-		A20000000000000000000018 /* MulticolorGradientShader.metal in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019; };
-		A20000000000000000000020 /* NowPlayingBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021; };
-		A20000000000000000000022 /* NowPlayingExpandTracking.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023; };
-		A20000000000000000000024 /* PlayerAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025; };
-		A20000000000000000000026 /* PlayerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027; };
-		A20000000000000000000028 /* PlayerButtonLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029; };
-		A20000000000000000000030 /* PlayerButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031; };
-		A20000000000000000000032 /* PlayerControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033; };
-		A20000000000000000000034 /* PlayerSystemVolumeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035; };
-		A20000000000000000000036 /* PressGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037; };
-		A20000000000000000000038 /* RegularNowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000039; };
-		A20000000000000000000040 /* TimingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000041; };
-		A20000000000000000000042 /* Uniforms.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000043; };
-		A20000000000000000000044 /* VialPlayerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000045; };
-		A20000000000000000000046 /* VolumeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000047; };
-		A10000000000000000000026 /* ElasticSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027; };
-		A10000000000000000000022 /* PanGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023; };
-		A10000000000000000000024 /* AppleMusicStylePlayer-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025; };
 		A10000000000000000000001 /* VialApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* VialApp.swift */; };
 		A10000000000000000000016 /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* Settings.bundle */; };
 		A10000000000000000000018 /* VialHeaderScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* VialHeaderScrollView.swift */; };
@@ -40,33 +13,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A20000000000000000000001 /* Collection+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/Collection+Extensions.swift"; sourceTree = "<group>"; };
-		A20000000000000000000003 /* ColorPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/ColorPoint.swift"; sourceTree = "<group>"; };
-		A20000000000000000000005 /* ColorfulBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/ColorfulBackground.swift"; sourceTree = "<group>"; };
-		A20000000000000000000007 /* ColorfulBackgroundModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/ColorfulBackgroundModel.swift"; sourceTree = "<group>"; };
-		A20000000000000000000009 /* CompactNowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/CompactNowPlaying.swift"; sourceTree = "<group>"; };
-		A20000000000000000000011 /* ExpandableNowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/ExpandableNowPlaying.swift"; sourceTree = "<group>"; };
-		A20000000000000000000013 /* ForwardLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/ForwardLabel.swift"; sourceTree = "<group>"; };
-		A20000000000000000000015 /* MarqueeText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/MarqueeText.swift"; sourceTree = "<group>"; };
-		A20000000000000000000017 /* MulticolorGradient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/MulticolorGradient.swift"; sourceTree = "<group>"; };
-		A20000000000000000000019 /* MulticolorGradientShader.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = "App/NowPlaying/MulticolorGradientShader.metal"; sourceTree = "<group>"; };
-		A20000000000000000000021 /* NowPlayingBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/NowPlayingBackground.swift"; sourceTree = "<group>"; };
-		A20000000000000000000023 /* NowPlayingExpandTracking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/NowPlayingExpandTracking.swift"; sourceTree = "<group>"; };
-		A20000000000000000000025 /* PlayerAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/PlayerAppearance.swift"; sourceTree = "<group>"; };
-		A20000000000000000000027 /* PlayerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/PlayerButton.swift"; sourceTree = "<group>"; };
-		A20000000000000000000029 /* PlayerButtonLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/PlayerButtonLabel.swift"; sourceTree = "<group>"; };
-		A20000000000000000000031 /* PlayerButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/PlayerButtons.swift"; sourceTree = "<group>"; };
-		A20000000000000000000033 /* PlayerControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/PlayerControls.swift"; sourceTree = "<group>"; };
-		A20000000000000000000035 /* PlayerSystemVolumeSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/PlayerSystemVolumeSlider.swift"; sourceTree = "<group>"; };
-		A20000000000000000000037 /* PressGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/PressGesture.swift"; sourceTree = "<group>"; };
-		A20000000000000000000039 /* RegularNowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/RegularNowPlaying.swift"; sourceTree = "<group>"; };
-		A20000000000000000000041 /* TimingIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/TimingIndicator.swift"; sourceTree = "<group>"; };
-		A20000000000000000000043 /* Uniforms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/Uniforms.swift"; sourceTree = "<group>"; };
-		A20000000000000000000045 /* VialPlayerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/VialPlayerSettings.swift"; sourceTree = "<group>"; };
-		A20000000000000000000047 /* VolumeSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/NowPlaying/VolumeSlider.swift"; sourceTree = "<group>"; };
-		A10000000000000000000027 /* ElasticSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/ElasticSlider.swift; sourceTree = "<group>"; };
-		A10000000000000000000023 /* PanGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/PanGesture.swift; sourceTree = "<group>"; };
-		A10000000000000000000025 /* AppleMusicStylePlayer-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = App/AppleMusicStylePlayer-LICENSE.txt; sourceTree = "<group>"; };
 		A10000000000000000000002 /* VialApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/VialApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000004 /* Vial.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vial.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -96,33 +42,6 @@
 				A10000000000000000000002 /* VialApp.swift */,
 				A10000000000000000000019 /* VialHeaderScrollView.swift */,
 				A10000000000000000000021 /* VialHeaderSettings.swift */,
-				A10000000000000000000023 /* PanGesture.swift */,
-				A10000000000000000000027 /* ElasticSlider.swift */,
-				A10000000000000000000025 /* AppleMusicStylePlayer-LICENSE.txt */,
-				A20000000000000000000001 /* Collection+Extensions.swift */,
-				A20000000000000000000003 /* ColorPoint.swift */,
-				A20000000000000000000005 /* ColorfulBackground.swift */,
-				A20000000000000000000007 /* ColorfulBackgroundModel.swift */,
-				A20000000000000000000009 /* CompactNowPlaying.swift */,
-				A20000000000000000000011 /* ExpandableNowPlaying.swift */,
-				A20000000000000000000013 /* ForwardLabel.swift */,
-				A20000000000000000000015 /* MarqueeText.swift */,
-				A20000000000000000000017 /* MulticolorGradient.swift */,
-				A20000000000000000000019 /* MulticolorGradientShader.metal */,
-				A20000000000000000000021 /* NowPlayingBackground.swift */,
-				A20000000000000000000023 /* NowPlayingExpandTracking.swift */,
-				A20000000000000000000025 /* PlayerAppearance.swift */,
-				A20000000000000000000027 /* PlayerButton.swift */,
-				A20000000000000000000029 /* PlayerButtonLabel.swift */,
-				A20000000000000000000031 /* PlayerButtons.swift */,
-				A20000000000000000000033 /* PlayerControls.swift */,
-				A20000000000000000000035 /* PlayerSystemVolumeSlider.swift */,
-				A20000000000000000000037 /* PressGesture.swift */,
-				A20000000000000000000039 /* RegularNowPlaying.swift */,
-				A20000000000000000000041 /* TimingIndicator.swift */,
-				A20000000000000000000043 /* Uniforms.swift */,
-				A20000000000000000000045 /* VialPlayerSettings.swift */,
-				A20000000000000000000047 /* VolumeSlider.swift */,
 			);
 			path = Vial;
 			sourceTree = "<group>";
@@ -174,7 +93,7 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A1000000000000000000000C /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000016 /* Settings.bundle in Resources */, A10000000000000000000024 /* AppleMusicStylePlayer-LICENSE.txt in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
+		A1000000000000000000000C /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000016 /* Settings.bundle in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -185,32 +104,6 @@
 				A10000000000000000000001 /* VialApp.swift in Sources */,
 				A10000000000000000000018 /* VialHeaderScrollView.swift in Sources */,
 				A10000000000000000000020 /* VialHeaderSettings.swift in Sources */,
-				A10000000000000000000022 /* PanGesture.swift in Sources */,
-				A10000000000000000000026 /* ElasticSlider.swift in Sources */,
-				A20000000000000000000000 /* Collection+Extensions.swift in Sources */,
-				A20000000000000000000002 /* ColorPoint.swift in Sources */,
-				A20000000000000000000004 /* ColorfulBackground.swift in Sources */,
-				A20000000000000000000006 /* ColorfulBackgroundModel.swift in Sources */,
-				A20000000000000000000008 /* CompactNowPlaying.swift in Sources */,
-				A20000000000000000000010 /* ExpandableNowPlaying.swift in Sources */,
-				A20000000000000000000012 /* ForwardLabel.swift in Sources */,
-				A20000000000000000000014 /* MarqueeText.swift in Sources */,
-				A20000000000000000000016 /* MulticolorGradient.swift in Sources */,
-				A20000000000000000000018 /* MulticolorGradientShader.metal in Sources */,
-				A20000000000000000000020 /* NowPlayingBackground.swift in Sources */,
-				A20000000000000000000022 /* NowPlayingExpandTracking.swift in Sources */,
-				A20000000000000000000024 /* PlayerAppearance.swift in Sources */,
-				A20000000000000000000026 /* PlayerButton.swift in Sources */,
-				A20000000000000000000028 /* PlayerButtonLabel.swift in Sources */,
-				A20000000000000000000030 /* PlayerButtons.swift in Sources */,
-				A20000000000000000000032 /* PlayerControls.swift in Sources */,
-				A20000000000000000000034 /* PlayerSystemVolumeSlider.swift in Sources */,
-				A20000000000000000000036 /* PressGesture.swift in Sources */,
-				A20000000000000000000038 /* RegularNowPlaying.swift in Sources */,
-				A20000000000000000000040 /* TimingIndicator.swift in Sources */,
-				A20000000000000000000042 /* Uniforms.swift in Sources */,
-				A20000000000000000000044 /* VialPlayerSettings.swift in Sources */,
-				A20000000000000000000046 /* VolumeSlider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
