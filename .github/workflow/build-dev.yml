@@ -1,0 +1,158 @@
+name: Build (dev)
+
+# Workflow-only changes do not trigger a build; VERSION changes do.
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'Vial/**'
+      - 'Vial.xcodeproj/**'
+      - 'Info.plist'
+      - 'VERSION'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-dev-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: xcode-27
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Xcode 27 and Swift 6.3 toolchain
+        run: |
+          set -e
+          xcodebuild -version
+          xcrun swift --version
+
+          xcodebuild -version | grep -Eq '^Xcode 27([.]|$)' || {
+            echo "::error::Expected Xcode 27"
+            exit 1
+          }
+
+          SWIFT_VERSION="$(xcrun swift --version | sed -nE 's/^Apple Swift version ([0-9]+\.[0-9]+).*/\1/p' | head -1)"
+          if [ -z "$SWIFT_VERSION" ] || ! awk -F. -v version="$SWIFT_VERSION" 'BEGIN {
+            split(version, v, ".")
+            exit !((v[1] + 0) > 6 || ((v[1] + 0) == 6 && (v[2] + 0) >= 3))
+          }'; then
+            echo "::error::Swift 6.3 or newer is required; found ${SWIFT_VERSION:-unknown}"
+            exit 1
+          fi
+
+      - name: Validate project inputs
+        run: |
+          set -e
+          test -d Vial.xcodeproj || {
+            echo "::error::Vial.xcodeproj not found"
+            exit 1
+          }
+          test -f Info.plist || {
+            echo "::error::Info.plist not found"
+            exit 1
+          }
+          plutil -lint Info.plist
+
+      - name: Resolve Swift packages
+        run: |
+          set -e
+          rm -rf build/DerivedData
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project Vial.xcodeproj \
+            -scheme Vial \
+            -derivedDataPath build/DerivedData
+
+          test -f Vial.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved || {
+            echo "::error::Xcode did not produce Package.resolved"
+            exit 1
+          }
+
+      - name: Read version
+        id: version
+        run: |
+          set -e
+          if [ ! -f VERSION ]; then
+            echo "::error::VERSION file not found in repository root"
+            exit 1
+          fi
+
+          RAW=$(tr -d '[:space:]' < VERSION)
+          if [ -z "$RAW" ]; then
+            echo "::error::VERSION file is empty"
+            exit 1
+          fi
+
+          echo "raw=$RAW" >> "$GITHUB_OUTPUT"
+          echo "Version: $RAW"
+
+      - name: Build unsigned iOS app (Debug)
+        run: |
+          set -e
+          xcodebuild \
+            -project Vial.xcodeproj \
+            -scheme Vial \
+            -sdk iphoneos \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -disableAutomaticPackageResolution \
+            MARKETING_VERSION='${{ steps.version.outputs.raw }}' \
+            CURRENT_PROJECT_VERSION='${{ github.run_number }}' \
+            PRODUCT_BUNDLE_IDENTIFIER=com.aholic.vial \
+            IPHONEOS_DEPLOYMENT_TARGET=26.0 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          set -e
+          APP="build/DerivedData/Build/Products/Debug-iphoneos/Vial.app"
+          IPA="build/Vial-${{ steps.version.outputs.raw }}-dev${{ github.run_number }}-unsigned.ipa"
+
+          test -d "$APP" || {
+            echo "::error::Vial.app was not produced"
+            exit 1
+          }
+
+          BUNDLE_ID=$(plutil -extract CFBundleIdentifier raw "$APP/Info.plist")
+          test "$BUNDLE_ID" = com.aholic.vial || {
+            echo "::error::Unexpected bundle identifier: $BUNDLE_ID"
+            exit 1
+          }
+
+          rm -rf build/Payload "$IPA"
+          mkdir -p build/Payload
+          cp -R "$APP" build/Payload/Vial.app
+
+          cd build
+          /usr/bin/zip -qry "$(basename "$IPA")" Payload
+          cd ..
+          rm -rf build/Payload
+
+          test -f "$IPA"
+          ls -lh "$IPA"
+          shasum -a 256 "$IPA"
+
+      - name: Smoke check product
+        run: |
+          set -e
+          APP="build/DerivedData/Build/Products/Debug-iphoneos/Vial.app"
+          ls -la "$APP"
+          plutil -p "$APP/Info.plist" | grep -E "CFBundleDisplayName|CFBundleIdentifier"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vial-${{ steps.version.outputs.raw }}-dev${{ github.run_number }}
+          path: build/Vial-*-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
