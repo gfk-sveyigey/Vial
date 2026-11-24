@@ -132,17 +132,22 @@ final class VialAccountRowSettings: ObservableObject {
 
     enum Metric: String, CaseIterable {
         case avatarSize, top, bottom, leading, trailing, height, usernameSize, detailSize
+        case outerTop, outerBottom, outerLeading, outerTrailing
 
         var configuration: (label: String, initial: Int, range: ClosedRange<Int>) {
             switch self {
             case .avatarSize: ("头像大小", 52, 16...120)
-            case .top: ("上边距", 0, 0...48)
-            case .bottom: ("下边距", 0, 0...48)
-            case .leading: ("左边距", 20, 0...48)
-            case .trailing: ("右边距", 20, 0...48)
+            case .top: ("上内边距", 0, 0...48)
+            case .bottom: ("下内边距", 0, 0...48)
+            case .leading: ("左内边距", 20, 0...48)
+            case .trailing: ("右内边距", 20, 0...48)
             case .height: ("最小行高", 52, 24...220)
             case .usernameSize: ("用户名字号", 17, 10...42)
             case .detailSize: ("第二行字号", 15, 10...42)
+            case .outerTop: ("上外边距", 12, 0...48)
+            case .outerBottom: ("下外边距", 0, 0...48)
+            case .outerLeading: ("左外边距", 16, 0...48)
+            case .outerTrailing: ("右外边距", 16, 0...48)
             }
         }
     }

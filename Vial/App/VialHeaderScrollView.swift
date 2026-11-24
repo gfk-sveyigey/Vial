@@ -249,13 +249,16 @@ struct VialHeaderScrollView<Content: View>: View {
                             .minimumScaleFactor(0.6)
                             .accessibilityAddTraits(.isHeader)
                         Spacer(minLength: 8)
-                        Button("账户", systemImage: "person.crop.circle") {
+                        Button {
                             showsAccount = true
+                        } label: {
+                            Image(systemName: "person.crop.circle")
+                                .font(.system(size: 30, weight: .medium))
+                                .frame(width: 36, height: 36)
                         }
-                        .labelStyle(.iconOnly)
-                        .font(.title2)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
+                        .accessibilityLabel("账户")
                     }
                         .foregroundStyle(Color(uiColor: .label))
                         .padding(.horizontal, 15)
@@ -432,56 +435,58 @@ private struct VialAccountSheet: View {
     @ObservedObject private var row = VialAccountRowSettings.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("账户")
-                    .font(.title2.bold())
-                    .accessibilityAddTraits(.isHeader)
-                Spacer()
-                Button("关闭", systemImage: "xmark") {
-                    dismiss()
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 14) {
+                        Image(systemName: "person.crop.circle.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: CGFloat(row[.avatarSize]), height: CGFloat(row[.avatarSize]))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("未登录")
+                                .font(.system(size: CGFloat(row[.usernameSize]), weight: .semibold))
+                            Text("占位信息")
+                                .font(.system(size: CGFloat(row[.detailSize])))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.top, CGFloat(row[.top]))
+                    .padding(.bottom, CGFloat(row[.bottom]))
+                    .padding(.leading, CGFloat(row[.leading]))
+                    .padding(.trailing, CGFloat(row[.trailing]))
+                    .frame(maxWidth: .infinity, minHeight: CGFloat(row[.height]), alignment: .leading)
+                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+                    .padding(.top, CGFloat(row[.outerTop]))
+                    .padding(.bottom, CGFloat(row[.outerBottom]))
+                    .padding(.leading, CGFloat(row[.outerLeading]))
+                    .padding(.trailing, CGFloat(row[.outerTrailing]))
+                    .accessibilityElement(children: .combine)
+
+                    VialActionRow("应用设置", systemImage: "gear") {
+                        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                        UIApplication.shared.open(url)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
                 }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.glass)
-                .controlSize(.large)
             }
-            .padding(20)
-
-            HStack(spacing: 14) {
-                Image(systemName: "person.crop.circle.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: CGFloat(row[.avatarSize]), height: CGFloat(row[.avatarSize]))
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("未登录")
-                        .font(.system(size: CGFloat(row[.usernameSize]), weight: .semibold))
-                    Text("占位信息")
-                        .font(.system(size: CGFloat(row[.detailSize])))
-                        .foregroundStyle(.secondary)
+            .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Text("账户")
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(role: .close) { dismiss() }
                 }
             }
-            .padding(.top, CGFloat(row[.top]))
-            .padding(.bottom, CGFloat(row[.bottom]))
-            .padding(.leading, CGFloat(row[.leading]))
-            .padding(.trailing, CGFloat(row[.trailing]))
-            .frame(maxWidth: .infinity, minHeight: CGFloat(row[.height]), alignment: .leading)
-            .accessibilityElement(children: .combine)
-
-            Spacer(minLength: 0)
-
-            Button {
-                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-                UIApplication.shared.open(url)
-            } label: {
-                Label("应用设置", systemImage: "gear")
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 12)
         }
     }
 }

@@ -4,12 +4,9 @@ import Observation
 
 @main
 struct VialApp: App {
-    @State private var librarySession = LibrarySession()
-
     var body: some Scene {
         WindowGroup {
             VialNavigationView()
-                .environment(librarySession)
                 .tint(Color.accentColor)
         }
     }
@@ -37,9 +34,9 @@ private enum VialTab: String, CaseIterable, Hashable, Identifiable {
     var symbol: String {
         switch self {
         case .home: "house"
-        case .discover: "sparkles"
+        case .discover: "square.grid.2x2"
         case .radio: "dot.radiowaves.left.and.right"
-        case .library: "square.stack"
+        case .library: "music.note.square.stack"
         case .search: "magnifyingglass"
         }
     }
@@ -320,7 +317,9 @@ private struct VialRootPage: View {
         case .home, .discover, .radio:
             EmptyView()
         case .library:
-            LibraryRows { isShowingDebugSheet = true }
+            VialActionRow("调试功能", systemImage: "ladybug") {
+                isShowingDebugSheet = true
+            }
         case .search:
             HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
@@ -335,33 +334,24 @@ private struct VialRootPage: View {
     }
 }
 
-@Observable
-private final class LibrarySession {
-    var placeholderCount = 0
-}
+struct VialActionRow: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    let action: () -> Void
 
-private struct LibraryRows: View {
-    @Environment(LibrarySession.self) private var session
-    let showDebugSettings: () -> Void
+    init(_ title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = systemImage
+        self.action = action
+    }
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Button("添加占位行", systemImage: "plus") {
-                    session.placeholderCount += 1
-                }
-                Spacer()
-                Button("调试功能", systemImage: "ladybug", action: showDebugSettings)
-            }
-            .padding(.vertical, 12)
-
-            ForEach(0..<session.placeholderCount, id: \.self) { index in
-                Divider()
-                Text("占位行 \(index + 1)")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 14)
-            }
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 }
 
