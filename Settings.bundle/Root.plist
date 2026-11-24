@@ -6,87 +6,11 @@
 	<array>
 		<dict>
 			<key>Type</key>
-			<string>PSGroupSpecifier</string>
+			<string>PSChildPaneSpecifier</string>
 			<key>Title</key>
 			<string>标签设置</string>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>允许收缩标签栏</string>
-			<key>Key</key>
-			<string>navigation.tabBarCanMinimize</string>
-			<key>DefaultValue</key>
-			<true/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSGroupSpecifier</string>
-			<key>Title</key>
-			<string>显示标签页</string>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>显示主页</string>
-			<key>Key</key>
-			<string>navigation.visible.home</string>
-			<key>DefaultValue</key>
-			<true/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>显示新发现</string>
-			<key>Key</key>
-			<string>navigation.visible.discover</string>
-			<key>DefaultValue</key>
-			<true/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>显示广播</string>
-			<key>Key</key>
-			<string>navigation.visible.radio</string>
-			<key>DefaultValue</key>
-			<true/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>显示资料库</string>
-			<key>Key</key>
-			<string>navigation.visible.library</string>
-			<key>DefaultValue</key>
-			<true/>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSGroupSpecifier</string>
-			<key>Title</key>
-			<string>搜索</string>
-			<key>FooterText</key>
-			<string>搜索页面始终显示，无法隐藏。</string>
-		</dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
-			<string>独立搜索页面</string>
-			<key>Key</key>
-			<string>navigation.searchIsIndependent</string>
-			<key>DefaultValue</key>
-			<false/>
-			<key>TrueValue</key>
-			<true/>
-			<key>FalseValue</key>
-			<false/>
+			<key>File</key>
+			<string>TabSettings</string>
 		</dict>
 	</array>
 	<key>StringsTable</key>

@@ -53,10 +53,10 @@ private enum VialTab: String, CaseIterable, Hashable, Identifiable {
 
     var visibilityKey: String? {
         switch self {
-        case .home: "navigation.visible.home"
-        case .discover: "navigation.visible.discover"
-        case .radio: "navigation.visible.radio"
-        case .library: "navigation.visible.library"
+        case .home: "navigation_visible_home"
+        case .discover: "navigation_visible_discover"
+        case .radio: "navigation_visible_radio"
+        case .library: "navigation_visible_library"
         case .search: nil
         }
     }
@@ -69,17 +69,28 @@ private final class VialNavigationPreferences {
     private(set) var visibleTabs: [VialTab]
     private(set) var searchIsIndependent: Bool
 
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private var defaultsObserver: UserDefaultsKeyObserver?
+
     init(defaults: UserDefaults = .standard) {
-        tabBarCanMinimize = Self.bool("navigation.tabBarCanMinimize", fallback: true, defaults: defaults)
+        self.defaults = defaults
+        Self.migrateLegacyKeys(defaults: defaults)
+        tabBarCanMinimize = Self.bool("navigation_tabBarCanMinimize", fallback: true, defaults: defaults)
         visibleTabs = Self.readVisibleTabs(defaults: defaults)
-        searchIsIndependent = Self.bool("navigation.searchIsIndependent", fallback: false, defaults: defaults)
+        searchIsIndependent = Self.bool("navigation_searchIsIndependent", fallback: false, defaults: defaults)
+        defaultsObserver = nil
+        defaultsObserver = UserDefaultsKeyObserver(defaults: defaults, keys: Self.observedKeys) { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.refreshIfNeeded()
+            }
+        }
     }
 
     // Settings.app changes these defaults out of process; reconcile on activation without publishing unchanged values.
-    func refreshIfNeeded(defaults: UserDefaults = .standard) {
-        let newTabBarCanMinimize = Self.bool("navigation.tabBarCanMinimize", fallback: true, defaults: defaults)
+    func refreshIfNeeded() {
+        let newTabBarCanMinimize = Self.bool("navigation_tabBarCanMinimize", fallback: true, defaults: defaults)
         let newVisibleTabs = Self.readVisibleTabs(defaults: defaults)
-        let newSearchIsIndependent = Self.bool("navigation.searchIsIndependent", fallback: false, defaults: defaults)
+        let newSearchIsIndependent = Self.bool("navigation_searchIsIndependent", fallback: false, defaults: defaults)
 
         if tabBarCanMinimize != newTabBarCanMinimize {
             tabBarCanMinimize = newTabBarCanMinimize
@@ -92,6 +103,35 @@ private final class VialNavigationPreferences {
         }
     }
 
+    private static let observedKeys = [
+        "navigation_tabBarCanMinimize",
+        "navigation_visible_home",
+        "navigation_visible_discover",
+        "navigation_visible_radio",
+        "navigation_visible_library",
+        "navigation_searchIsIndependent"
+    ]
+
+    private static let legacyKeyMappings = [
+        "navigation.tabBarCanMinimize": "navigation_tabBarCanMinimize",
+        "navigation.visible.home": "navigation_visible_home",
+        "navigation.visible.discover": "navigation_visible_discover",
+        "navigation.visible.radio": "navigation_visible_radio",
+        "navigation.visible.library": "navigation_visible_library",
+        "navigation.searchIsIndependent": "navigation_searchIsIndependent"
+    ]
+
+    private static func migrateLegacyKeys(defaults: UserDefaults) {
+        let domainName = Bundle.main.bundleIdentifier ?? "com.aholic.vial"
+        let storedValues = defaults.persistentDomain(forName: domainName) ?? [:]
+        for (oldKey, newKey) in legacyKeyMappings {
+            if let value = storedValues[oldKey], storedValues[newKey] == nil {
+                defaults.set(value, forKey: newKey)
+            }
+            defaults.removeObject(forKey: oldKey)
+        }
+    }
+
     private static func readVisibleTabs(defaults: UserDefaults) -> [VialTab] {
         VialTab.allCases.filter { tab in
             guard let key = tab.visibilityKey else { return true }
@@ -101,6 +141,37 @@ private final class VialNavigationPreferences {
 
     private static func bool(_ key: String, fallback: Bool, defaults: UserDefaults) -> Bool {
         defaults.object(forKey: key) as? Bool ?? fallback
+    }
+}
+
+private final class UserDefaultsKeyObserver: NSObject, @unchecked Sendable {
+    private let defaults: UserDefaults
+    private let keys: [String]
+    private let onChange: @Sendable () -> Void
+
+    init(defaults: UserDefaults, keys: [String], onChange: @escaping @Sendable () -> Void) {
+        self.defaults = defaults
+        self.keys = keys
+        self.onChange = onChange
+        super.init()
+        keys.forEach { defaults.addObserver(self, forKeyPath: $0, options: [.new], context: nil) }
+    }
+
+    deinit {
+        keys.forEach { defaults.removeObserver(self, forKeyPath: $0) }
+    }
+
+    override func observeValue(
+        forKeyPath keyPath: String?,
+        of object: Any?,
+        change: [NSKeyValueChangeKey: Any]?,
+        context: UnsafeMutableRawPointer?
+    ) {
+        guard let keyPath, keys.contains(keyPath) else {
+            super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
+            return
+        }
+        onChange()
     }
 }
 
@@ -140,15 +211,18 @@ private struct VialTabsView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            ForEach(preferences.visibleTabs) { tab in
-                if tab == .search, preferences.searchIsIndependent {
-                    Tab(tab.title, systemImage: tab.symbol, value: tab, role: .search) {
-                        NavigationStack { VialRootPage(tab: tab) }
-                    }
-                } else {
-                    Tab(tab.title, systemImage: tab.symbol, value: tab) {
-                        NavigationStack { VialRootPage(tab: tab) }
-                    }
+            ForEach(preferences.visibleTabs.filter { $0 != .search }) { tab in
+                Tab(tab.title, systemImage: tab.symbol, value: tab) {
+                    NavigationStack { VialRootPage(tab: tab) }
+                }
+            }
+            if preferences.searchIsIndependent {
+                Tab("搜索", systemImage: "magnifyingglass", value: VialTab.search, role: .search) {
+                    NavigationStack { VialRootPage(tab: .search) }
+                }
+            } else {
+                Tab("搜索", systemImage: "magnifyingglass", value: VialTab.search) {
+                    NavigationStack { VialRootPage(tab: .search) }
                 }
             }
         }
@@ -349,6 +423,15 @@ private struct VialDebugSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Button {
+                    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                    UIApplication.shared.open(url)
+                } label: {
+                    Label("系统设置", systemImage: "gearshape")
+                }
+            }
+
             Section {
                 DisclosureGroup("导航栏 Header") {
                     Stepper(value: $expandedHeight, in: 100...180, step: 2) {
