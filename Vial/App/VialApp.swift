@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import Observation
 import MediaPlayer
+import OSLog
 
 @main
 struct VialApp: App {
@@ -477,10 +478,12 @@ private struct PlayerArtworkTransition: UIViewControllerRepresentable {
     }
 
     final class Controller: UIViewController {
+        private let logger = Logger(subsystem: "com.aholic.vial", category: "ArtworkTransition")
         var miniArtworkFrame = CGRect.zero
         var miniPlayerFrame = CGRect.zero
         private let artwork = UIView()
         private let symbol = UIImageView(image: UIImage(systemName: "music.note"))
+        private var pendingExpansion = false
 
         override func viewDidLoad() {
             super.viewDidLoad()
@@ -500,53 +503,84 @@ private struct PlayerArtworkTransition: UIViewControllerRepresentable {
             let side = min(72, view.bounds.width * 0.35)
             symbol.frame = CGRect(x: artwork.bounds.midX - side / 2,
                                   y: artwork.bounds.midY - side / 2, width: side, height: side)
+            startExpansionIfReady()
         }
 
         override func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
-            animateArtwork(expanding: true)
+            pendingExpansion = animated && !UIAccessibility.isReduceMotionEnabled
+            startExpansionIfReady()
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            if pendingExpansion {
+                logger.debug("Artwork expansion skipped: no active presentation with valid geometry")
+            }
+            pendingExpansion = false
+            artwork.transform = .identity
         }
 
         override func viewWillDisappear(_ animated: Bool) {
             super.viewWillDisappear(animated)
-            animateArtwork(expanding: false)
-        }
-
-        private func animateArtwork(expanding: Bool) {
-            guard !UIAccessibility.isReduceMotionEnabled,
-                  let coordinator = transitionCoordinator else { return }
-            if expanding {
-                UIView.performWithoutAnimation {
-                    self.view.layoutIfNeeded()
-                    self.applyCompactTransform()
-                }
-                let registered = coordinator.animate(alongsideTransition: { _ in
-                    self.artwork.transform = .identity
-                })
-                if !registered { artwork.transform = .identity }
-            } else {
-                coordinator.animate(alongsideTransition: { _ in
-                    self.applyCompactTransform()
-                }, completion: { context in
-                    if context.isCancelled { self.artwork.transform = .identity }
-                })
+            pendingExpansion = false
+            guard animated, !UIAccessibility.isReduceMotionEnabled,
+                  let coordinator = presentationCoordinator,
+                  let transform = compactTransform(in: coordinator) else {
+                if animated { logger.debug("Artwork dismissal skipped: no active presentation with valid geometry") }
+                return
             }
+            let registered = coordinator.animate(alongsideTransition: { _ in
+                self.artwork.transform = transform
+            }, completion: { context in
+                if context.isCancelled { self.artwork.transform = .identity }
+            })
+            logger.debug("Artwork dismissal registered: \(registered)")
         }
 
-        private func applyCompactTransform() {
+        private var presentationCoordinator: (any UIViewControllerTransitionCoordinator)? {
+            var ancestor = parent
+            while let controller = ancestor {
+                if controller.presentingViewController?.presentedViewController === controller,
+                   let coordinator = controller.transitionCoordinator {
+                    return coordinator
+                }
+                ancestor = controller.parent
+            }
+            return transitionCoordinator
+        }
+
+        private func startExpansionIfReady() {
+            guard pendingExpansion,
+                  let coordinator = presentationCoordinator,
+                  let transform = compactTransform(in: coordinator) else { return }
+            pendingExpansion = false
+            UIView.performWithoutAnimation { artwork.transform = transform }
+            let registered = coordinator.animate(alongsideTransition: { _ in
+                self.artwork.transform = .identity
+            })
+            if !registered { artwork.transform = .identity }
+            logger.debug("Artwork expansion registered: \(registered)")
+        }
+
+        private func compactTransform(in coordinator: any UIViewControllerTransitionCoordinator) -> CGAffineTransform? {
             guard !miniArtworkFrame.isEmpty, !miniPlayerFrame.isEmpty,
-                  let window = view.window, view.bounds.width > 0, view.bounds.height > 0 else { return }
+                  view.window != nil, view.bounds.width > 0, view.bounds.height > 0 else { return nil }
             // The system zoom already maps the full page into the mini-player.
             // Map the artwork inside that destination, rather than applying a second window-space zoom.
-            let panel = window.bounds
+            let key: UITransitionContextViewKey = pendingExpansion ? .to : .from
+            let panelView = coordinator.viewController(forKey: pendingExpansion ? .to : .from)?.view
+                ?? coordinator.view(forKey: key)
+            guard let panelView, view.isDescendant(of: panelView), !panelView.bounds.isEmpty else { return nil }
+            let panel = panelView.bounds
             let scaleX = miniArtworkFrame.width / miniPlayerFrame.width * panel.width / view.bounds.width
             let scaleY = miniArtworkFrame.height / miniPlayerFrame.height * panel.height / view.bounds.height
             let target = CGPoint(
                 x: panel.minX + (miniArtworkFrame.midX - miniPlayerFrame.minX) / miniPlayerFrame.width * panel.width,
                 y: panel.minY + (miniArtworkFrame.midY - miniPlayerFrame.minY) / miniPlayerFrame.height * panel.height
             )
-            let local = view.convert(target, from: window)
-            artwork.transform = CGAffineTransform(
+            let local = view.convert(target, from: panelView)
+            return CGAffineTransform(
                 translationX: local.x - artwork.center.x,
                 y: local.y - artwork.center.y
             ).scaledBy(x: scaleX, y: scaleY)
