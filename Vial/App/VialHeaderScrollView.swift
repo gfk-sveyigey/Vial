@@ -93,6 +93,7 @@ private struct MediaHeaderGeometry {
 struct VialHeaderScrollView<Content: View>: View {
     let title: String
     private let content: Content
+    @State private var showsAccount = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .largeTitle) private var mediaTitleScale: CGFloat = 1
@@ -153,9 +154,11 @@ struct VialHeaderScrollView<Content: View>: View {
             }
             .overlay(alignment: .top) {
                 mediaHeader(topInset: topInset)
-                    .allowsHitTesting(false)
             }
             .ignoresSafeArea(.container, edges: .top)
+        }
+        .sheet(isPresented: $showsAccount) {
+            VialAccountSheet()
         }
         .task(id: mediaHeaderSnap) {
             guard let snap = mediaHeaderSnap else { return }
@@ -239,12 +242,22 @@ struct VialHeaderScrollView<Content: View>: View {
                         .animation(nil, value: hidesMediaGlassForCollapse)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
-                    Text(title)
-                        .font(.system(size: 34 * mediaTitleScale, weight: .bold))
+                    HStack(alignment: .top) {
+                        Text(title)
+                            .font(.system(size: 34 * mediaTitleScale, weight: .bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .accessibilityAddTraits(.isHeader)
+                        Spacer(minLength: 8)
+                        Button("账户", systemImage: "person.crop.circle") {
+                            showsAccount = true
+                        }
+                        .labelStyle(.iconOnly)
+                        .font(.title2)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
                         .foregroundStyle(Color(uiColor: .label))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                        .accessibilityAddTraits(.isHeader)
                         .padding(.horizontal, 15)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(height: contentHeaderHeight, alignment: .top)
@@ -412,6 +425,65 @@ struct VialHeaderScrollView<Content: View>: View {
         }
     }
 
+}
+
+private struct VialAccountSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var row = VialAccountRowSettings.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("账户")
+                    .font(.title2.bold())
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button("关闭", systemImage: "xmark") {
+                    dismiss()
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.glass)
+                .controlSize(.large)
+            }
+            .padding(20)
+
+            HStack(spacing: 14) {
+                Image(systemName: "person.crop.circle.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: CGFloat(row[.avatarSize]), height: CGFloat(row[.avatarSize]))
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("未登录")
+                        .font(.system(size: CGFloat(row[.usernameSize]), weight: .semibold))
+                    Text("占位信息")
+                        .font(.system(size: CGFloat(row[.detailSize])))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.top, CGFloat(row[.top]))
+            .padding(.bottom, CGFloat(row[.bottom]))
+            .padding(.leading, CGFloat(row[.leading]))
+            .padding(.trailing, CGFloat(row[.trailing]))
+            .frame(maxWidth: .infinity, minHeight: CGFloat(row[.height]), alignment: .leading)
+            .accessibilityElement(children: .combine)
+
+            Spacer(minLength: 0)
+
+            Button {
+                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                UIApplication.shared.open(url)
+            } label: {
+                Label("应用设置", systemImage: "gear")
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+        }
+    }
 }
 
 private struct VialMediaStatusBarBlur: View {

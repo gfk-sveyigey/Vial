@@ -124,6 +124,43 @@ final class VialHeaderSettings: ObservableObject {
     }
 }
 
+@MainActor
+final class VialAccountRowSettings: ObservableObject {
+    static let shared = VialAccountRowSettings()
+    private static let storageKey = "debug.accountRow"
+    @Published private var values = UserDefaults.standard.dictionary(forKey: VialAccountRowSettings.storageKey) as? [String: Int] ?? [:]
+
+    enum Metric: String, CaseIterable {
+        case avatarSize, top, bottom, leading, trailing, height, usernameSize, detailSize
+
+        var configuration: (label: String, initial: Int, range: ClosedRange<Int>) {
+            switch self {
+            case .avatarSize: ("头像大小", 52, 16...120)
+            case .top: ("上边距", 0, 0...48)
+            case .bottom: ("下边距", 0, 0...48)
+            case .leading: ("左边距", 20, 0...48)
+            case .trailing: ("右边距", 20, 0...48)
+            case .height: ("最小行高", 52, 24...220)
+            case .usernameSize: ("用户名字号", 17, 10...42)
+            case .detailSize: ("第二行字号", 15, 10...42)
+            }
+        }
+    }
+
+    subscript(_ metric: Metric) -> Int {
+        get {
+            let configuration = metric.configuration
+            let value = values[metric.rawValue] ?? configuration.initial
+            return min(configuration.range.upperBound, max(configuration.range.lowerBound, value))
+        }
+        set {
+            guard metric.configuration.range.contains(newValue), self[metric] != newValue else { return }
+            values[metric.rawValue] = newValue
+            UserDefaults.standard.set(values, forKey: Self.storageKey)
+        }
+    }
+}
+
 enum VialHeaderTint {
     static func color(_ hex: String) -> Color {
         guard hex.count == 7, hex.hasPrefix("#"), let rgb = UInt32(hex.dropFirst(), radix: 16) else {

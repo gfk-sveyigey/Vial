@@ -4,9 +4,12 @@ import Observation
 
 @main
 struct VialApp: App {
+    @State private var librarySession = LibrarySession()
+
     var body: some Scene {
         WindowGroup {
             VialNavigationView()
+                .environment(librarySession)
                 .tint(Color.accentColor)
         }
     }
@@ -198,6 +201,7 @@ private struct VialNavigationShell: View {
 private struct VialTabsView: View {
     let preferences: VialNavigationPreferences
     @Binding var selection: VialTab
+    @State private var showsPlayer = false
 
     var body: some View {
         TabView(selection: $selection) {
@@ -216,9 +220,67 @@ private struct VialTabsView: View {
                 }
             }
         }
+        .tabViewBottomAccessory {
+            Button {
+                showsPlayer = true
+            } label: {
+                Label("未在播放", systemImage: "music.note")
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("打开全屏播放器")
+        }
+        .fullScreenCover(isPresented: $showsPlayer) {
+            VialPlayerView()
+        }
         .onChange(of: preferences.visibleTabs) { _, tabs in
             if !tabs.contains(selection) { selection = tabs.first ?? .search }
         }
+    }
+}
+
+private struct VialPlayerView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                dismiss()
+            } label: {
+                Capsule()
+                    .fill(.white.opacity(0.85))
+                    .frame(width: 36, height: 4)
+                    .frame(width: 96, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("收起播放器")
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 12).onEnded { value in
+                    if value.translation.height > 35 &&
+                        value.translation.height > abs(value.translation.width) {
+                        dismiss()
+                    }
+                }
+            )
+
+            ContentUnavailableView("未在播放", systemImage: "music.note")
+                .frame(maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background {
+            LinearGradient(
+                colors: [Color(red: 0.19, green: 0.20, blue: 0.27), .black],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        }
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -255,85 +317,57 @@ private struct VialRootPage: View {
     @ViewBuilder
     private var pageContent: some View {
         switch tab {
-        case .home:
-            VStack(alignment: .leading, spacing: 20) {
-                Text("继续探索")
-                    .font(.title2.weight(.semibold))
-                ContentPlaceholder(symbol: "play.rectangle", title: "还没有最近内容", detail: "你访问的内容会显示在这里。")
-                Text("为你推荐")
-                    .font(.title2.weight(.semibold))
-                ContentPlaceholder(symbol: "sparkles", title: "推荐内容即将呈现", detail: "新内容和个性化推荐会在这里出现。")
-            }
-        case .discover:
-            ContentPlaceholder(symbol: "sparkles", title: "发现新内容", detail: "热门内容、主题和最新更新会显示在这里。")
-        case .radio:
-            ContentPlaceholder(symbol: "dot.radiowaves.left.and.right", title: "广播频道", detail: "选择一个频道，开始收听正在播放的内容。")
+        case .home, .discover, .radio:
+            EmptyView()
         case .library:
-            VStack(spacing: 16) {
-                ContentPlaceholder(symbol: "square.stack", title: "你的资料库", detail: "收藏的内容和播放记录会整理在这里。")
-                Button {
-                    isShowingDebugSheet = true
-                } label: {
-                    Label("调试功能", systemImage: "ladybug")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-            }
+            LibraryRows { isShowingDebugSheet = true }
         case .search:
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField("搜索内容或频道", text: $searchQuery)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                }
-                .padding(14)
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-
-                ContentPlaceholder(
-                    symbol: "magnifyingglass",
-                    title: searchQuery.isEmpty ? "搜索 Vial" : "没有找到相关内容",
-                    detail: searchQuery.isEmpty ? "输入名称，查找内容或广播频道。" : "试试其他关键词。"
-                )
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("搜索内容或频道", text: $searchQuery)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
             }
+            .padding(14)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
         }
     }
 }
 
-private struct ContentPlaceholder: View {
-    let symbol: String
-    let title: String
-    let detail: String
+@Observable
+private final class LibrarySession {
+    var placeholderCount = 0
+}
+
+private struct LibraryRows: View {
+    @Environment(LibrarySession.self) private var session
+    let showDebugSettings: () -> Void
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.system(size: 25, weight: .regular))
-                .foregroundStyle(.tint)
-                .frame(width: 56, height: 56)
-                .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
+        LazyVStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Button("添加占位行", systemImage: "plus") {
+                    session.placeholderCount += 1
+                }
+                Spacer()
+                Button("调试功能", systemImage: "ladybug", action: showDebugSettings)
+            }
+            .padding(.vertical, 12)
 
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(.primary)
-
-            Text(detail)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            ForEach(0..<session.placeholderCount, id: \.self) { index in
+                Divider()
+                Text("占位行 \(index + 1)")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 14)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(24)
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
 private struct VialDebugSettingsView: View {
     @ObservedObject private var layout = VialHeaderSettings.shared
+    @ObservedObject private var accountRow = VialAccountRowSettings.shared
     @AppStorage("debug.header.lightTint") private var lightTint = "#FFFFFF"
     @AppStorage("debug.header.darkTint") private var darkTint = "#000000"
 
@@ -345,6 +379,26 @@ private struct VialDebugSettingsView: View {
                     UIApplication.shared.open(url)
                 } label: {
                     Label("系统设置", systemImage: "gearshape")
+                }
+            }
+
+            Section {
+                DisclosureGroup("账号信息行") {
+                    ForEach(VialAccountRowSettings.Metric.allCases, id: \.rawValue) { metric in
+                        let configuration = metric.configuration
+                        Stepper(
+                            value: Binding(get: { accountRow[metric] }, set: { accountRow[metric] = $0 }),
+                            in: configuration.range
+                        ) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(configuration.label)
+                                Text("\(accountRow[metric]) pt")
+                                    .font(.footnote)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
             }
 
