@@ -544,7 +544,7 @@ private struct VialFadingBackdropBlur: View, Animatable {
 }
 
 /// A paused UIKit effect transition provides a public blur-strength control.
-struct VialBackdropBlur: UIViewRepresentable {
+private struct VialBackdropBlur: UIViewRepresentable {
     let style: UIBlurEffect.Style
     let strength: Double
     var fadesAtBottom = false
