@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import Observation
+import MediaPlayer
 
 @main
 struct VialApp: App {
@@ -200,6 +201,7 @@ private struct VialTabsView: View {
     @Binding var selection: VialTab
     @State private var showsPlayer = false
     @Namespace private var playerTransition
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         TabView(selection: $selection) {
@@ -219,55 +221,173 @@ private struct VialTabsView: View {
             }
         }
         .tabViewBottomAccessory {
-            Button {
-                showsPlayer = true
-            } label: {
-                Label("未在播放", systemImage: "music.note")
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(1)
+            HStack(spacing: 8) {
+                Button {
+                    setPlayerPresented(true)
+                } label: {
+                    HStack(spacing: 8) {
+                        Color.clear
+                            .frame(width: 32, height: 32)
+                            .overlay {
+                                if !showsPlayer {
+                                    PlayerArtworkPlaceholder(iconSize: 15, cornerRadius: 7)
+                                        .matchedGeometryEffect(id: "playerArtwork", in: playerTransition)
+                                        .transition(.identity)
+                                }
+                            }
+                            .accessibilityHidden(true)
+                        Text("未在播放")
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                    }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .padding(.horizontal, 16)
                     .contentShape(Rectangle())
+                }
+                .accessibilityHint("打开全屏播放器")
+
+                Button("播放", systemImage: "play.fill") {}
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(true)
+                Button("下一首", systemImage: "forward.fill") {}
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(true)
             }
+            .labelStyle(.iconOnly)
             .buttonStyle(.plain)
-            .accessibilityHint("打开全屏播放器")
-            .matchedTransitionSource(id: "miniPlayer", in: playerTransition)
+            .padding(.horizontal, 12)
         }
-        .fullScreenCover(isPresented: $showsPlayer) {
-            VialPlayerView()
-                .navigationTransition(.zoom(sourceID: "miniPlayer", in: playerTransition))
+        .allowsHitTesting(!showsPlayer)
+        .accessibilityHidden(showsPlayer)
+        .overlay {
+            if showsPlayer {
+                VialPlayerView(artworkTransition: playerTransition) {
+                    setPlayerPresented(false)
+                }
+                .transition(.opacity)
+            }
         }
         .onChange(of: preferences.visibleTabs) { _, tabs in
             if !tabs.contains(selection) { selection = tabs.first ?? .search }
         }
     }
+
+    private func setPlayerPresented(_ presented: Bool) {
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.42)) {
+            showsPlayer = presented
+        }
+    }
 }
 
 private struct PlayerGrabberSettings: DynamicProperty {
-    @AppStorage("debug.playerGrabber.topGap") var topGap = 20
-    @AppStorage("debug.playerGrabber.length") var length = 36
-    @AppStorage("debug.playerGrabber.thickness") var thickness = 4
+    private static let defaultTopGap = 7
+    private static let defaultLength = 60
+    private static let defaultThickness = 4
+    private static let defaultColor = "#FFFFFF"
+
+    @AppStorage("debug.playerGrabber.topGap") var topGap = PlayerGrabberSettings.defaultTopGap
+    @AppStorage("debug.playerGrabber.length") var length = PlayerGrabberSettings.defaultLength
+    @AppStorage("debug.playerGrabber.thickness") var thickness = PlayerGrabberSettings.defaultThickness
+    @AppStorage("debug.playerGrabber.color") var color = PlayerGrabberSettings.defaultColor
+    @AppStorage("debug.playerGrabber.blur") var blur = 0
+    @AppStorage("debug.playerGrabber.glass") var glass = 0
+
+    func reset() {
+        topGap = Self.defaultTopGap
+        length = Self.defaultLength
+        thickness = Self.defaultThickness
+        color = Self.defaultColor
+        blur = 0
+        glass = 0
+    }
 }
 
 private struct VialPlayerView: View {
-    @Environment(\.dismiss) private var dismiss
+    let artworkTransition: Namespace.ID
+    var dismiss: () -> Void
     private var grabberSettings = PlayerGrabberSettings()
 
     var body: some View {
-        ContentUnavailableView("未在播放", systemImage: "music.note")
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ScrollView {
+            VStack(spacing: 24) {
+                PlayerArtworkPlaceholder(iconSize: 72, cornerRadius: 20)
+                    .matchedGeometryEffect(id: "playerArtwork", in: artworkTransition)
+                    .aspectRatio(1, contentMode: .fit)
+                    .accessibilityLabel("歌曲封面")
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("未在播放")
+                        .font(.title2.bold())
+                    progressControls
+                        .modifier(PlayerControlPressEffect())
+                }
+                transportControls
+                volumeControls
+                    .modifier(PlayerControlPressEffect())
+            }
+            .frame(maxWidth: 440)
+            .padding(.horizontal, 24)
+            .padding(.top, 48)
+            .padding(.bottom, 24)
+            .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
                 LinearGradient(
-                    colors: [Color(red: 0.19, green: 0.20, blue: 0.27), .black],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                    colors: [VialHeaderTint.color("#6B6B6B"), VialHeaderTint.color("#404040")],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
                 .ignoresSafeArea()
             }
             .overlay(alignment: .top) {
                 grabber
             }
-            .preferredColorScheme(.dark)
+            .environment(\.colorScheme, .dark)
+            .accessibilityAddTraits(.isModal)
+    }
+
+    private var progressControls: some View {
+        VStack(spacing: 4) {
+            Slider(value: .constant(0.0), in: 0...1) {
+                Text("播放进度")
+            }
+            HStack {
+                Text("—:—").accessibilityLabel("已播放时长不可用")
+                Spacer()
+                Text("—:—").accessibilityLabel("剩余时长不可用")
+            }
+            .font(.caption.monospacedDigit())
+        }
+        .foregroundStyle(.secondary)
+        .disabled(true)
+    }
+
+    private var transportControls: some View {
+        HStack(spacing: 24) {
+            Button("上一首", systemImage: "backward.fill") {}
+                .font(.system(size: 28))
+            Button("播放", systemImage: "play.fill") {}
+                .font(.system(size: 44))
+            Button("下一首", systemImage: "forward.fill") {}
+                .font(.system(size: 28))
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.plain)
+        .disabled(true)
+    }
+
+    private var volumeControls: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "speaker.fill")
+                .accessibilityHidden(true)
+            PlayerSystemVolumeSlider()
+                .frame(maxWidth: .infinity)
+                .frame(height: 32)
+            Image(systemName: "speaker.wave.3.fill")
+                .accessibilityHidden(true)
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
     }
 
     private var grabber: some View {
@@ -275,7 +395,15 @@ private struct VialPlayerView: View {
             dismiss()
         } label: {
             Capsule()
-                .fill(.white.opacity(0.85))
+                .fill(VialHeaderTint.color(grabberSettings.color).opacity(0.85))
+                .blur(radius: CGFloat(grabberSettings.blur))
+                .background {
+                    if grabberSettings.glass > 0 {
+                        VialBackdropBlur(style: .systemMaterial, strength: Double(grabberSettings.glass) / 100)
+                            .clipShape(Capsule())
+                            .allowsHitTesting(false)
+                    }
+                }
                 .frame(width: CGFloat(grabberSettings.length), height: CGFloat(grabberSettings.thickness))
                 .frame(minWidth: 96, minHeight: 44, alignment: .top)
                 .contentShape(Rectangle())
@@ -292,6 +420,53 @@ private struct VialPlayerView: View {
         )
         .padding(.top, CGFloat(grabberSettings.topGap))
     }
+}
+
+private struct PlayerControlPressEffect: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @GestureState private var isPressed = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isPressed && !reduceMotion ? 1.05 : 1)
+            .animation(.easeInOut(duration: 0.18), value: isPressed)
+            .contentShape(Rectangle())
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.3)
+                    .sequenced(before: DragGesture(minimumDistance: 0))
+                    .updating($isPressed) { value, pressed, _ in
+                        if case .second(true, _) = value {
+                            pressed = true
+                        }
+                    }
+            )
+    }
+}
+
+private struct PlayerArtworkPlaceholder: View {
+    let iconSize: CGFloat
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .fill(Color(uiColor: .systemGray4))
+            .overlay {
+                Image(systemName: "music.note")
+                    .font(.system(size: iconSize, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+    }
+}
+
+private struct PlayerSystemVolumeSlider: UIViewRepresentable {
+    func makeUIView(context: Context) -> MPVolumeView {
+        let view = MPVolumeView(frame: .zero)
+        view.showsRouteButton = false
+        return view
+    }
+
+    func updateUIView(_ view: MPVolumeView, context: Context) {}
 }
 
 private struct VialRootPage: View {
@@ -391,6 +566,12 @@ private struct VialDebugSettingsView: View {
                     Stepper("距顶部安全区 \(grabberSettings.topGap) pt", value: grabberSettings.$topGap, in: 0...80)
                     Stepper("横向长度 \(grabberSettings.length) pt", value: grabberSettings.$length, in: 12...160)
                     Stepper("厚度 \(grabberSettings.thickness) pt", value: grabberSettings.$thickness, in: 1...16)
+                    ColorPicker("颜色", selection: VialHeaderTint.binding(grabberSettings.$color), supportsOpacity: false)
+                    Stepper("白条模糊强度 \(grabberSettings.blur) pt", value: grabberSettings.$blur, in: 0...16)
+                    Stepper("背景毛玻璃强度 \(grabberSettings.glass)%", value: grabberSettings.$glass, in: 0...100, step: 5)
+                    Button("恢复默认值", systemImage: "arrow.counterclockwise") {
+                        grabberSettings.reset()
+                    }
                 }
             }
 
@@ -411,6 +592,9 @@ private struct VialDebugSettingsView: View {
                             }
                         }
                     }
+                    Button("恢复默认值", systemImage: "arrow.counterclockwise") {
+                        accountRow.reset()
+                    }
                 }
             }
 
@@ -421,7 +605,7 @@ private struct VialDebugSettingsView: View {
                     }
                     ColorPicker("浅色毛玻璃色调", selection: VialHeaderTint.binding($lightTint), supportsOpacity: false)
                     ColorPicker("深色毛玻璃色调", selection: VialHeaderTint.binding($darkTint), supportsOpacity: false)
-                    Button("恢复 Header 默认值", systemImage: "arrow.counterclockwise") {
+                    Button("恢复默认值", systemImage: "arrow.counterclockwise") {
                         layout.reset()
                         lightTint = "#FFFFFF"
                         darkTint = "#000000"

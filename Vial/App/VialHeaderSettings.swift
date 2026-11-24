@@ -166,6 +166,13 @@ final class VialAccountRowSettings: ObservableObject {
     }
 }
 
+extension VialAccountRowSettings {
+    func reset() {
+        values = [:]
+        UserDefaults.standard.removeObject(forKey: Self.storageKey)
+    }
+}
+
 enum VialHeaderTint {
     static func color(_ hex: String) -> Color {
         guard hex.count == 7, hex.hasPrefix("#"), let rgb = UInt32(hex.dropFirst(), radix: 16) else {
