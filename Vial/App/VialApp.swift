@@ -279,10 +279,6 @@ private struct VialTabsView: View {
                     ? CGRect(x: 12, y: viewport.size.height - 50, width: max(1, viewport.size.width - 24), height: 44)
                     : miniPlayerFrame.offsetBy(dx: -origin.x, dy: -origin.y)
                 let panel = showsPlayer || reduceMotion ? full : compact
-                let contentScale = showsPlayer || reduceMotion ? 1 : min(
-                    compact.width / max(1, full.width),
-                    compact.height / max(1, full.height)
-                )
 
                 ZStack(alignment: .topLeading) {
                     VialPlayerView(drawsArtwork: !hasArtworkFrames, artworkFrame: $fullArtworkFrame) {
@@ -290,12 +286,6 @@ private struct VialTabsView: View {
                     }
                     .coordinateSpace(name: "playerLayout")
                     .environment(\.colorScheme, .dark)
-                    .scaleEffect(contentScale)
-                    .offset(
-                        x: showsPlayer || reduceMotion ? 0 : compact.midX - viewport.size.width / 2,
-                        y: showsPlayer || reduceMotion ? 0 : compact.midY - viewport.size.height / 2
-                    )
-                    .background(Color(white: 0.25).ignoresSafeArea())
                     .mask(alignment: .topLeading) {
                         RoundedRectangle(cornerRadius: showsPlayer ? 0 : compact.height / 2)
                             .frame(width: panel.width, height: panel.height)
