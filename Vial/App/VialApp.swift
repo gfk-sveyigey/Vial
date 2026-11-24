@@ -229,10 +229,12 @@ private struct VialTabsView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityHint("打开全屏播放器")
+            .accessibilityHint("打开播放器")
         }
-        .fullScreenCover(isPresented: $showsPlayer) {
+        .sheet(isPresented: $showsPlayer) {
             VialPlayerView()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .onChange(of: preferences.visibleTabs) { _, tabs in
             if !tabs.contains(selection) { selection = tabs.first ?? .search }
@@ -241,43 +243,18 @@ private struct VialTabsView: View {
 }
 
 private struct VialPlayerView: View {
-    @Environment(\.dismiss) private var dismiss
-
     var body: some View {
-        VStack(spacing: 0) {
-            Button {
-                dismiss()
-            } label: {
-                Capsule()
-                    .fill(.white.opacity(0.85))
-                    .frame(width: 36, height: 4)
-                    .frame(width: 96, height: 44)
-                    .contentShape(Rectangle())
+        ContentUnavailableView("未在播放", systemImage: "music.note")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+                LinearGradient(
+                    colors: [Color(red: 0.19, green: 0.20, blue: 0.27), .black],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("收起播放器")
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 12).onEnded { value in
-                    if value.translation.height > 35 &&
-                        value.translation.height > abs(value.translation.width) {
-                        dismiss()
-                    }
-                }
-            )
-
-            ContentUnavailableView("未在播放", systemImage: "music.note")
-                .frame(maxHeight: .infinity)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background {
-            LinearGradient(
-                colors: [Color(red: 0.19, green: 0.20, blue: 0.27), .black],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-        }
-        .preferredColorScheme(.dark)
+            .preferredColorScheme(.dark)
     }
 }
 
