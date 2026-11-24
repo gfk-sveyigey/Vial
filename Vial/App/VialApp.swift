@@ -300,11 +300,8 @@ private struct PlayerGrabberSettings: DynamicProperty {
 
 private struct VialPlayerView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAdjustingVolume = false
     @GestureState private var isPressingProgress = false
-    @GestureState(resetTransaction: Transaction(animation: .interpolatingSpring(duration: 0.3, bounce: 0)))
-    private var pullOffset: CGFloat = 0
     private var grabberSettings = PlayerGrabberSettings()
 
     var body: some View {
@@ -353,31 +350,9 @@ private struct VialPlayerView: View {
                 .ignoresSafeArea()
             }
             .overlay(alignment: .top) { grabber }
-            .contentShape(Rectangle())
-            .offset(y: reduceMotion ? 0 : pullOffset)
-            .simultaneousGesture(dismissDrag(height: viewport.size.height + viewport.safeAreaInsets.top + viewport.safeAreaInsets.bottom))
         }
             .preferredColorScheme(.dark)
             .accessibilityAddTraits(.isModal)
-    }
-
-    private func dismissDrag(height: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 12, coordinateSpace: .global)
-            .updating($pullOffset) { value, offset, transaction in
-                guard !reduceMotion, canPullDown(value) else { return }
-                transaction.animation = nil
-                offset = value.translation.height
-            }
-            .onEnded { value in
-                guard height > 0, canPullDown(value) else { return }
-                let projectedDistance = max(value.translation.height, value.predictedEndTranslation.height)
-                if projectedDistance > height / 2 { dismiss() }
-            }
-    }
-
-    private func canPullDown(_ value: DragGesture.Value) -> Bool {
-        !isAdjustingVolume && !isPressingProgress &&
-            value.translation.height > abs(value.translation.width)
     }
 
     private var progressControls: some View {
