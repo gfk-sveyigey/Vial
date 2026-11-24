@@ -368,9 +368,11 @@ private struct VialDebugSettingsView: View {
                 }
             }
 
-            Section("说明") {
+            Section {
                 Text("调试参数用于临时调整 Vial 导航栏布局。标签栏显示状态和搜索模式请在系统设置中修改。")
                     .foregroundStyle(.secondary)
+            } header: {
+                Text("说明")
             } footer: {
                 Text("调试入口暂时位于资料库页面。")
             }
