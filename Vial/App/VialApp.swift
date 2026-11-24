@@ -200,7 +200,9 @@ private struct VialTabsView: View {
     let preferences: VialNavigationPreferences
     @Binding var selection: VialTab
     @State private var showsPlayer = false
-    @Namespace private var playerTransition
+    @State private var miniPlayerFrame = CGRect.zero
+    @State private var miniArtworkFrame = CGRect.zero
+    @State private var fullArtworkFrame = CGRect.zero
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var miniArtwork = MiniPlayerArtworkSettings()
 
@@ -230,15 +232,16 @@ private struct VialTabsView: View {
                         Color.clear
                             .frame(width: CGFloat(miniArtwork.side), height: CGFloat(miniArtwork.side))
                             .overlay {
-                                if !showsPlayer {
+                                if !showsPlayer && !hasArtworkFrames {
                                     PlayerArtworkPlaceholder(
                                         iconSize: CGFloat(miniArtwork.side) * 15 / 32,
                                         cornerRadius: CGFloat(miniArtwork.side) * 7 / 32
                                     )
-                                        .matchedGeometryEffect(id: "playerArtwork", in: playerTransition)
-                                        .transition(.identity)
                                 }
                             }
+                            .onGeometryChange(for: CGRect.self) { geometry in
+                                geometry.frame(in: .global)
+                            } action: { miniArtworkFrame = $0 }
                             .accessibilityHidden(true)
                             .padding(.leading, CGFloat(miniArtwork.leading))
                             .padding(.trailing, CGFloat(miniArtwork.trailing))
@@ -261,19 +264,50 @@ private struct VialTabsView: View {
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
             .padding(.trailing, 12)
+            .onGeometryChange(for: CGRect.self) { geometry in
+                geometry.frame(in: .global)
+            } action: { miniPlayerFrame = $0 }
         }
         .allowsHitTesting(!showsPlayer)
         .accessibilityHidden(showsPlayer)
         .overlay {
-            VialPlayerView(isPresented: showsPlayer, artworkTransition: playerTransition) {
+            VialPlayerView(
+                isPresented: showsPlayer,
+                miniPlayerFrame: miniPlayerFrame,
+                drawsArtwork: !hasArtworkFrames,
+                artworkFrame: $fullArtworkFrame
+            ) {
                 setPlayerPresented(false)
             }
             .allowsHitTesting(showsPlayer)
             .accessibilityHidden(!showsPlayer)
         }
+        .overlay {
+            GeometryReader { geometry in
+                if hasArtworkFrames {
+                    let origin = geometry.frame(in: .global).origin
+                    let frame = showsPlayer ? fullArtworkFrame : miniArtworkFrame
+                    PlayerArtworkPlaceholder(
+                        iconSize: showsPlayer ? min(72, frame.width * 0.35) : frame.width * 15 / 32,
+                        cornerRadius: showsPlayer ? 20 : frame.width * 7 / 32
+                    )
+                    .environment(\.colorScheme, showsPlayer ? .dark : colorScheme)
+                    .frame(width: frame.width, height: frame.height)
+                    .position(x: frame.midX - origin.x, y: frame.midY - origin.y)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
         .onChange(of: preferences.visibleTabs) { _, tabs in
             if !tabs.contains(selection) { selection = tabs.first ?? .search }
         }
+    }
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var hasArtworkFrames: Bool {
+        !miniArtworkFrame.isEmpty && !fullArtworkFrame.isEmpty
     }
 
     private func setPlayerPresented(_ presented: Bool) {
@@ -322,7 +356,9 @@ private struct PlayerGrabberSettings: DynamicProperty {
 
 private struct VialPlayerView: View {
     let isPresented: Bool
-    let artworkTransition: Namespace.ID
+    let miniPlayerFrame: CGRect
+    let drawsArtwork: Bool
+    @Binding var artworkFrame: CGRect
     var dismiss: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAdjustingVolume = false
@@ -333,19 +369,35 @@ private struct VialPlayerView: View {
         GeometryReader { viewport in
             let isCompact = viewport.size.height < 560
             let spacing: CGFloat = isCompact ? 12 : 24
-            let travel = viewport.size.height + viewport.safeAreaInsets.top + viewport.safeAreaInsets.bottom
-            let panelOffset = isPresented || reduceMotion ? 0 : travel
+            let safeArea = viewport.safeAreaInsets
+            let origin = viewport.frame(in: .global).origin
+            let fullFrame = CGRect(
+                x: -safeArea.leading,
+                y: -safeArea.top,
+                width: viewport.size.width + safeArea.leading + safeArea.trailing,
+                height: viewport.size.height + safeArea.top + safeArea.bottom
+            )
+            let compactFrame = miniPlayerFrame.isEmpty
+                ? CGRect(x: 12, y: fullFrame.maxY - 52, width: max(1, fullFrame.width - 24), height: 44)
+                : miniPlayerFrame.offsetBy(dx: -origin.x, dy: -origin.y)
+            let panelFrame = isPresented || reduceMotion ? fullFrame : compactFrame
+            let controlsOffset = isPresented || reduceMotion ? 0 : max(0, compactFrame.midY - fullFrame.midY)
             VStack(spacing: 24) {
                 GeometryReader { artwork in
                     let side = max(0, min(artwork.size.width, artwork.size.height))
-                    if isPresented {
-                        PlayerArtworkPlaceholder(iconSize: min(72, side * 0.35), cornerRadius: 20)
-                            .matchedGeometryEffect(id: "playerArtwork", in: artworkTransition)
-                            .frame(width: side, height: side)
-                            .accessibilityLabel("歌曲封面")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .transition(.identity)
-                    }
+                    Color.clear
+                        .frame(width: side, height: side)
+                        .overlay {
+                            if isPresented && drawsArtwork {
+                                PlayerArtworkPlaceholder(iconSize: min(72, side * 0.35), cornerRadius: 20)
+                            }
+                        }
+                        .onGeometryChange(for: CGRect.self) { geometry in
+                            geometry.frame(in: .global)
+                        } action: { artworkFrame = $0 }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("歌曲封面")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
                 VStack(spacing: spacing) {
@@ -359,7 +411,7 @@ private struct VialPlayerView: View {
                         .modifier(PlayerControlPressEffect(isPressed: isAdjustingVolume))
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                .offset(y: panelOffset)
+                .offset(y: controlsOffset)
                 .opacity(isPresented ? 1 : 0)
             }
             .frame(maxWidth: 440)
@@ -382,16 +434,18 @@ private struct VialPlayerView: View {
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
-                .offset(y: panelOffset)
-                .opacity(isPresented ? 1 : 0)
             }
             .overlay(alignment: .top) {
                 grabber
-                    .offset(y: panelOffset)
                     .opacity(isPresented ? 1 : 0)
             }
+            .mask(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: isPresented ? 0 : 22)
+                    .frame(width: panelFrame.width, height: panelFrame.height)
+                    .offset(x: panelFrame.minX, y: panelFrame.minY)
+            }
+            .opacity(isPresented ? 1 : 0)
         }
-        .animation(reduceMotion ? nil : .smooth(duration: 0.42), value: isPresented)
             .environment(\.colorScheme, .dark)
             .accessibilityAddTraits(.isModal)
             .contentShape(Rectangle())
