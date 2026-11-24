@@ -204,6 +204,8 @@ private struct VialTabsView: View {
     @State private var fullArtworkFrame = CGRect.zero
     @State private var miniArtworkFrame = CGRect.zero
     @State private var miniPlayerFrame = CGRect.zero
+    @State private var compactControls: [PlayerSharedControl: CGRect] = [:]
+    @State private var expandedControls: [PlayerSharedControl: CGRect] = [:]
     private var miniArtwork = MiniPlayerArtworkSettings()
 
     var body: some View {
@@ -244,16 +246,31 @@ private struct VialTabsView: View {
                         Text("未在播放")
                             .font(.system(size: 14, weight: .medium))
                             .lineLimit(1)
+                            .playerControlEndpoint(hidden: sharesControl(.title), in: .global) {
+                                compactControls[.title] = $0
+                            }
                     }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .accessibilityHint("打开全屏播放器")
 
-                Button("播放", systemImage: "play.fill") {}
+                Button {} label: {
+                    Image(systemName: "play.fill")
+                        .playerControlEndpoint(hidden: sharesControl(.play), in: .global) {
+                            compactControls[.play] = $0
+                        }
+                }
+                    .accessibilityLabel("播放")
                     .frame(minWidth: 44, minHeight: 44)
                     .disabled(true)
-                Button("下一首", systemImage: "forward.fill") {}
+                Button {} label: {
+                    Image(systemName: "forward.fill")
+                        .playerControlEndpoint(hidden: sharesControl(.next), in: .global) {
+                            compactControls[.next] = $0
+                        }
+                }
+                    .accessibilityLabel("下一首")
                     .frame(minWidth: 44, minHeight: 44)
                     .disabled(true)
             }
@@ -281,7 +298,12 @@ private struct VialTabsView: View {
                 let panel = showsPlayer || reduceMotion ? full : compact
 
                 ZStack(alignment: .topLeading) {
-                    VialPlayerView(drawsArtwork: !hasArtworkFrames, artworkFrame: $fullArtworkFrame) {
+                    VialPlayerView(
+                        drawsArtwork: !hasArtworkFrames,
+                        artworkFrame: $fullArtworkFrame,
+                        sharedControls: Set(PlayerSharedControl.allCases.filter { sharesControl($0) }),
+                        measureControl: { expandedControls[$0] = $1 }
+                    ) {
                         setPlayerPresented(false)
                     }
                     .coordinateSpace(name: "playerLayout")
@@ -308,6 +330,16 @@ private struct VialTabsView: View {
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                     }
+                    ForEach(PlayerSharedControl.allCases, id: \.self) { control in
+                        if let compact = compactControls[control], let expanded = expandedControls[control],
+                           sharesControl(control) {
+                            let frame = showsPlayer ? expanded : compact.offsetBy(dx: -origin.x, dy: -origin.y)
+                            control.visual(expanded: showsPlayer, compact: compact, destination: frame)
+                                .position(x: frame.midX, y: frame.midY)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
+                    }
                 }
                 .frame(width: viewport.size.width, height: viewport.size.height)
             }
@@ -319,6 +351,11 @@ private struct VialTabsView: View {
 
     private var hasArtworkFrames: Bool {
         !miniArtworkFrame.isEmpty && !fullArtworkFrame.isEmpty
+    }
+
+    private func sharesControl(_ control: PlayerSharedControl) -> Bool {
+        guard let compact = compactControls[control], let expanded = expandedControls[control] else { return false }
+        return !compact.isEmpty && !expanded.isEmpty
     }
 
     private func setPlayerPresented(_ presented: Bool) {
@@ -365,9 +402,49 @@ private struct PlayerGrabberSettings: DynamicProperty {
     }
 }
 
+private enum PlayerSharedControl: CaseIterable {
+    case title, play, next
+
+    @ViewBuilder
+    func visual(expanded: Bool, compact: CGRect, destination: CGRect) -> some View {
+        switch self {
+        case .title:
+            Text("未在播放")
+                .font(.system(size: 14, weight: expanded ? .bold : .medium))
+                .fixedSize()
+                .scaleEffect(destination.height / max(1, compact.height))
+                .foregroundStyle(expanded ? Color.white : Color.primary)
+        case .play, .next:
+            Image(systemName: self == .play ? "play.fill" : "forward.fill")
+                .resizable()
+                .scaledToFit()
+                .frame(width: compact.width, height: compact.height)
+                .scaleEffect(
+                    x: destination.width / max(1, compact.width),
+                    y: destination.height / max(1, compact.height)
+                )
+                .foregroundStyle((expanded ? Color.white : Color.primary).opacity(0.35))
+        }
+    }
+}
+
+private extension View {
+    func playerControlEndpoint(
+        hidden: Bool,
+        in space: CoordinateSpace,
+        measure: @escaping (CGRect) -> Void
+    ) -> some View {
+        onGeometryChange(for: CGRect.self) { $0.frame(in: space) } action: { measure($0) }
+            .opacity(hidden ? 0 : 1)
+            .animation(nil, value: hidden)
+    }
+}
+
 private struct VialPlayerView: View {
     let drawsArtwork: Bool
     @Binding var artworkFrame: CGRect
+    let sharedControls: Set<PlayerSharedControl>
+    let measureControl: (PlayerSharedControl, CGRect) -> Void
     var dismiss: () -> Void
     @State private var isAdjustingVolume = false
     @GestureState private var isPressingProgress = false
@@ -395,6 +472,9 @@ private struct VialPlayerView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("未在播放")
                             .font(.title2.bold())
+                            .playerControlEndpoint(hidden: sharedControls.contains(.title), in: .named("playerLayout")) {
+                                measureControl(.title, $0)
+                            }
                         progressControls
                     }
                     transportControls
@@ -467,10 +547,22 @@ private struct VialPlayerView: View {
         HStack(spacing: 24) {
             Button("上一首", systemImage: "backward.fill") {}
                 .font(.system(size: 28))
-            Button("播放", systemImage: "play.fill") {}
-                .font(.system(size: 44))
-            Button("下一首", systemImage: "forward.fill") {}
-                .font(.system(size: 28))
+            Button {} label: {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 44))
+                    .playerControlEndpoint(hidden: sharedControls.contains(.play), in: .named("playerLayout")) {
+                        measureControl(.play, $0)
+                    }
+            }
+            .accessibilityLabel("播放")
+            Button {} label: {
+                Image(systemName: "forward.fill")
+                    .font(.system(size: 28))
+                    .playerControlEndpoint(hidden: sharedControls.contains(.next), in: .named("playerLayout")) {
+                        measureControl(.next, $0)
+                    }
+            }
+            .accessibilityLabel("下一首")
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.plain)
