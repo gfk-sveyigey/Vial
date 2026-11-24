@@ -203,6 +203,7 @@ private struct VialTabsView: View {
     @Namespace private var playerTransition
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var miniArtwork = MiniPlayerArtworkSettings()
+    @ScaledMetric(relativeTo: .subheadline) private var miniPlayerTitleSize: CGFloat = 14
 
     var body: some View {
         TabView(selection: $selection) {
@@ -243,7 +244,7 @@ private struct VialTabsView: View {
                             .padding(.leading, CGFloat(miniArtwork.leading))
                             .padding(.trailing, CGFloat(miniArtwork.trailing))
                         Text("未在播放")
-                            .font(.subheadline.weight(.medium))
+                            .font(.system(size: miniPlayerTitleSize, weight: .medium))
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -265,12 +266,11 @@ private struct VialTabsView: View {
         .allowsHitTesting(!showsPlayer)
         .accessibilityHidden(showsPlayer)
         .overlay {
-            if showsPlayer {
-                VialPlayerView(artworkTransition: playerTransition) {
-                    setPlayerPresented(false)
-                }
-                .transition(.identity)
+            VialPlayerView(isPresented: showsPlayer, artworkTransition: playerTransition) {
+                setPlayerPresented(false)
             }
+            .allowsHitTesting(showsPlayer)
+            .accessibilityHidden(!showsPlayer)
         }
         .onChange(of: preferences.visibleTabs) { _, tabs in
             if !tabs.contains(selection) { selection = tabs.first ?? .search }
@@ -322,24 +322,34 @@ private struct PlayerGrabberSettings: DynamicProperty {
 }
 
 private struct VialPlayerView: View {
+    let isPresented: Bool
     let artworkTransition: Namespace.ID
     var dismiss: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @GestureState(resetTransaction: Transaction(animation: .spring(response: 0.34, dampingFraction: 0.86)))
+    private var pull: PlayerPull = .pending
     @State private var isAdjustingVolume = false
     @GestureState private var isPressingProgress = false
     private var grabberSettings = PlayerGrabberSettings()
 
     var body: some View {
         GeometryReader { viewport in
+            let travel = viewport.size.height + viewport.safeAreaInsets.top + viewport.safeAreaInsets.bottom
+            let pullDistance = isPresented && !reduceMotion ? pull.distance : 0
+            let panelOffset = isPresented || reduceMotion ? pullDistance : travel
             let isCompact = viewport.size.height < 560
             let spacing: CGFloat = isCompact ? 12 : 24
             VStack(spacing: 24) {
                 GeometryReader { artwork in
                     let side = max(0, min(artwork.size.width, artwork.size.height))
-                    PlayerArtworkPlaceholder(iconSize: min(72, side * 0.35), cornerRadius: 20)
-                        .matchedGeometryEffect(id: "playerArtwork", in: artworkTransition)
-                        .frame(width: side, height: side)
-                        .accessibilityLabel("歌曲封面")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if isPresented {
+                        PlayerArtworkPlaceholder(iconSize: min(72, side * 0.35), cornerRadius: 20)
+                            .matchedGeometryEffect(id: "playerArtwork", in: artworkTransition)
+                            .frame(width: side, height: side)
+                            .accessibilityLabel("歌曲封面")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .transition(.identity)
+                    }
                 }
 
                 VStack(spacing: spacing) {
@@ -353,15 +363,15 @@ private struct VialPlayerView: View {
                         .modifier(PlayerControlPressEffect(isPressed: isAdjustingVolume))
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                .transition(.offset(y: 40).combined(with: .opacity))
+                .offset(y: panelOffset - pullDistance)
+                .opacity(isPresented ? 1 : 0)
             }
             .frame(maxWidth: 440)
             .padding(.horizontal, 24)
             .padding(.top, 48)
             .padding(.bottom, spacing)
             .frame(maxWidth: .infinity)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
                 LinearGradient(
                     stops: (0...24).map { index in
@@ -375,24 +385,62 @@ private struct VialPlayerView: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .transition(.move(edge: .bottom))
                 .ignoresSafeArea()
+                .offset(y: panelOffset - pullDistance)
+                .opacity(reduceMotion && !isPresented ? 0 : 1)
             }
             .overlay(alignment: .top) {
                 grabber
-                    .transition(.opacity)
+                    .offset(y: panelOffset - pullDistance)
+                    .opacity(isPresented ? 1 : 0)
             }
+            .offset(y: pullDistance)
+            .contentShape(Rectangle())
+            .simultaneousGesture(dismissGesture(travel: travel))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
             .environment(\.colorScheme, .dark)
             .accessibilityAddTraits(.isModal)
-            .contentShape(Rectangle())
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 12).onEnded { value in
-                    let movement = value.translation
-                    if movement.height > 35 && movement.height > abs(movement.width) {
-                        dismiss()
-                    }
+            .accessibilityAction(.escape) { dismiss() }
+    }
+
+    private enum PlayerPull {
+        case pending, ignored, vertical(CGFloat)
+
+        var distance: CGFloat {
+            if case let .vertical(distance) = self { return distance }
+            return 0
+        }
+    }
+
+    private func dismissGesture(travel: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .global)
+            .updating($pull) { value, state, transaction in
+                guard isPresented, !isAdjustingVolume else {
+                    state = .ignored
+                    return
                 }
-            )
+                let movement = value.translation
+                transaction.animation = nil
+                switch state {
+                case .pending:
+                    state = movement.height > abs(movement.width)
+                        ? .vertical(min(movement.height, travel))
+                        : .ignored
+                case .vertical:
+                    state = .vertical(min(max(0, movement.height), travel))
+                case .ignored:
+                    break
+                }
+            }
+            .onEnded { value in
+                guard isPresented, !isAdjustingVolume, case .vertical = pull else { return }
+                let distance = value.translation.height
+                let projected = value.predictedEndTranslation.height
+                if distance >= travel * 0.25 || (distance > 24 && projected >= travel * 0.35) {
+                    dismiss()
+                }
+            }
     }
 
     private var progressControls: some View {
