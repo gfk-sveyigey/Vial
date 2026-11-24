@@ -8,6 +8,8 @@
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* VialApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* VialApp.swift */; };
 		A10000000000000000000016 /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* Settings.bundle */; };
+		A10000000000000000000018 /* VialHeaderScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* VialHeaderScrollView.swift */; };
+		A10000000000000000000020 /* VialHeaderSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* VialHeaderSettings.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -15,6 +17,8 @@
 		A10000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000004 /* Vial.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vial.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000017 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.plug-in; path = Settings.bundle; sourceTree = "<group>"; };
+		A10000000000000000000019 /* VialHeaderScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/VialHeaderScrollView.swift; sourceTree = "<group>"; };
+		A10000000000000000000021 /* VialHeaderSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/VialHeaderSettings.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -34,7 +38,11 @@
 		};
 		A10000000000000000000007 /* Vial */ = {
 			isa = PBXGroup;
-			children = (A10000000000000000000002 /* VialApp.swift */,);
+			children = (
+				A10000000000000000000002 /* VialApp.swift */,
+				A10000000000000000000019 /* VialHeaderScrollView.swift */,
+				A10000000000000000000021 /* VialHeaderSettings.swift */,
+			);
 			path = Vial;
 			sourceTree = "<group>";
 		};
@@ -92,7 +100,11 @@
 		A1000000000000000000000F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (A10000000000000000000001 /* VialApp.swift in Sources */,);
+			files = (
+				A10000000000000000000001 /* VialApp.swift in Sources */,
+				A10000000000000000000018 /* VialHeaderScrollView.swift in Sources */,
+				A10000000000000000000020 /* VialHeaderSettings.swift in Sources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */

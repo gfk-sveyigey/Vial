@@ -41,16 +41,6 @@ private enum VialTab: String, CaseIterable, Hashable, Identifiable {
         }
     }
 
-    var subtitle: String {
-        switch self {
-        case .home: "为你整理的内容"
-        case .discover: "看看最近有什么新内容"
-        case .radio: "正在播出的频道"
-        case .library: "收藏与最近访问"
-        case .search: "搜索内容与频道"
-        }
-    }
-
     var visibilityKey: String? {
         switch self {
         case .home: "navigation_visible_home"
@@ -235,50 +225,16 @@ private struct VialTabsView: View {
 private struct VialRootPage: View {
     let tab: VialTab
 
-    @AppStorage("debug.header.expandedHeight") private var headerExpandedHeight = 126
-    @AppStorage("debug.header.collapsedHeight") private var headerCollapsedHeight = 68
-    @AppStorage("debug.header.collapseDistance") private var headerCollapseDistance = 64
-    @State private var scrollOffset: CGFloat = 0
     @State private var isShowingDebugSheet = false
     @State private var searchQuery = ""
 
-    private var collapseProgress: CGFloat {
-        return min(1, max(0, -scrollOffset / CGFloat(max(headerCollapseDistance, 1))))
-    }
-
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(uiColor: .systemGroupedBackground)
-                .ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    GeometryReader { proxy in
-                        Color.clear.preference(
-                            key: VialScrollOffsetKey.self,
-                            value: proxy.frame(in: .named("vial.scroll")).minY
-                        )
-                    }
-                    .frame(height: 0)
-
-                    pageContent
-                        .padding(.top, CGFloat(headerExpandedHeight))
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 32)
-                }
-            }
-            .coordinateSpace(name: "vial.scroll")
-            .scrollIndicators(.hidden)
-            .onPreferenceChange(VialScrollOffsetKey.self) { scrollOffset = $0 }
-
-            VialRootHeader(
-                title: tab.title,
-                subtitle: tab.subtitle,
-                collapseProgress: collapseProgress,
-                expandedHeight: CGFloat(headerExpandedHeight),
-                collapsedHeight: CGFloat(headerCollapsedHeight)
-            )
+        VialHeaderScrollView(title: tab.title) {
+            pageContent
+                .padding(.horizontal, 20)
+                .padding(.bottom, 32)
         }
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $isShowingDebugSheet) {
             NavigationStack {
@@ -347,46 +303,6 @@ private struct VialRootPage: View {
     }
 }
 
-private struct VialRootHeader: View {
-    let title: String
-    let subtitle: String
-    let collapseProgress: CGFloat
-    let expandedHeight: CGFloat
-    let collapsedHeight: CGFloat
-
-    private var headerHeight: CGFloat {
-        expandedHeight - (expandedHeight - collapsedHeight) * collapseProgress
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.system(size: 32 - 8 * collapseProgress, weight: .bold, design: .rounded))
-                        .lineLimit(1)
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .opacity(1 - collapseProgress)
-                        .frame(height: 20 * (1 - collapseProgress), alignment: .top)
-                        .clipped()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 10)
-            .frame(height: headerHeight, alignment: .center)
-
-            Rectangle()
-                .fill(Color.primary.opacity(0.06))
-                .frame(height: 0.5)
-        }
-        .background(.regularMaterial)
-        .animation(.spring(response: 0.34, dampingFraction: 0.88), value: collapseProgress > 0.5)
-    }
-}
-
 private struct ContentPlaceholder: View {
     let symbol: String
     let title: String
@@ -417,9 +333,9 @@ private struct ContentPlaceholder: View {
 }
 
 private struct VialDebugSettingsView: View {
-    @AppStorage("debug.header.expandedHeight") private var expandedHeight = 126
-    @AppStorage("debug.header.collapsedHeight") private var collapsedHeight = 68
-    @AppStorage("debug.header.collapseDistance") private var collapseDistance = 64
+    @ObservedObject private var layout = VialHeaderSettings.shared
+    @AppStorage("debug.header.lightTint") private var lightTint = "#FFFFFF"
+    @AppStorage("debug.header.darkTint") private var darkTint = "#000000"
 
     var body: some View {
         Form {
@@ -434,49 +350,63 @@ private struct VialDebugSettingsView: View {
 
             Section {
                 DisclosureGroup("导航栏 Header") {
-                    Stepper(value: $expandedHeight, in: 100...180, step: 2) {
-                        metricLabel("展开高度", value: expandedHeight)
+                    ForEach(VialHeaderSettings.Metric.allCases, id: \.rawValue) { metric in
+                        control(for: metric)
                     }
-                    Stepper(value: $collapsedHeight, in: 52...100, step: 2) {
-                        metricLabel("收起高度", value: collapsedHeight)
-                    }
-                    Stepper(value: $collapseDistance, in: 24...160, step: 4) {
-                        metricLabel("收起滚动距离", value: collapseDistance)
-                    }
+                    ColorPicker("浅色毛玻璃色调", selection: VialHeaderTint.binding($lightTint), supportsOpacity: false)
+                    ColorPicker("深色毛玻璃色调", selection: VialHeaderTint.binding($darkTint), supportsOpacity: false)
                     Button("恢复 Header 默认值", systemImage: "arrow.counterclockwise") {
-                        expandedHeight = 126
-                        collapsedHeight = 68
-                        collapseDistance = 64
+                        layout.reset()
+                        lightTint = "#FFFFFF"
+                        darkTint = "#000000"
                     }
                 }
             }
+        }
+    }
 
-            Section {
-                Text("调试参数用于临时调整 Vial 导航栏布局。标签栏显示状态和搜索模式请在系统设置中修改。")
-                    .foregroundStyle(.secondary)
-            } header: {
-                Text("说明")
-            } footer: {
-                Text("调试入口暂时位于资料库页面。")
+    @ViewBuilder
+    private func control(for metric: VialHeaderSettings.Metric) -> some View {
+        let value = Binding(get: { layout[metric] }, set: { layout[metric] = $0 })
+        switch metric {
+        case .mediaSnapConflict:
+            Picker(metric.label, selection: value) {
+                Text("根据滚动方向").tag(0)
+                Text("根据距离").tag(1)
+            }
+        case .mediaContentOpacityCurve, .mediaContentBlurCurve, .mediaSnapCurve, .mediaEdgeHeightCurve, .mediaEdgeCurve:
+            Picker(metric.label, selection: value) {
+                Text("线性").tag(0)
+                Text("缓入缓出").tag(1)
+                Text("缓入").tag(2)
+                Text("缓出").tag(3)
+                Text("平滑阶梯").tag(4)
+            }
+        default:
+            Stepper(value: value, in: metric.range) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(metric.label)
+                    metricValue(metric)
+                        .font(.footnote)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
 
-    private func metricLabel(_ title: String, value: Int) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text("\(value) pt")
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+    private func metricValue(_ metric: VialHeaderSettings.Metric) -> Text {
+        switch metric {
+        case .mediaGlassBorderWidth:
+            Text("\(layout.mediaGlassBorderWidth, format: .number.precision(.fractionLength(2))) pt")
+        case .mediaSnapDuration:
+            Text("\(layout[metric]) ms")
+        case .mediaGlassStrength, .mediaGlassTint, .mediaGlassBorderOpacity, .mediaSnapThreshold,
+             .mediaSnapCollapsedThreshold, .mediaEdgeTopStrength, .mediaEdgeTopMaxStrength,
+             .mediaEdgeBottomStrength, .mediaEdgeTint:
+            Text(Double(layout[metric]) / 100, format: .percent)
+        default:
+            Text("\(layout[metric]) pt")
         }
-    }
-}
-
-private struct VialScrollOffsetKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
