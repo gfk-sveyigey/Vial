@@ -1,5 +1,7 @@
 # Vial
 
+播放器复用 [AppleMusicStylePlayer](https://github.com/f728743/AppleMusicStylePlayer/tree/a0b5631417dec05d092c3c61df4679ed361743bf) 的 `PanGesture`、下拉收起判定和 `ElasticSlider`。MIT 许可声明随应用打包，见 [AppleMusicStylePlayer-LICENSE.txt](Vial/App/AppleMusicStylePlayer-LICENSE.txt)。
+
 iOS 应用，Bundle Identifier：`com.aholic.vial`。最低支持 iOS 26.0，版本号由根目录 `VERSION` 管理。
 
 ## 导航

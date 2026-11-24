@@ -326,8 +326,8 @@ private struct VialPlayerView: View {
     let artworkTransition: Namespace.ID
     var dismiss: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @GestureState(resetTransaction: Transaction(animation: .spring(response: 0.34, dampingFraction: 0.86)))
-    private var pull: PlayerPull = .pending
+    @State private var offsetY: CGFloat = 0
+    @State private var isPullingDown: Bool?
     @State private var isAdjustingVolume = false
     @GestureState private var isPressingProgress = false
     private var grabberSettings = PlayerGrabberSettings()
@@ -335,7 +335,7 @@ private struct VialPlayerView: View {
     var body: some View {
         GeometryReader { viewport in
             let travel = viewport.size.height + viewport.safeAreaInsets.top + viewport.safeAreaInsets.bottom
-            let pullDistance = isPresented && !reduceMotion ? pull.distance : 0
+            let pullDistance = isPresented && !reduceMotion ? offsetY : 0
             let panelOffset = isPresented || reduceMotion ? pullDistance : travel
             let isCompact = viewport.size.height < 560
             let spacing: CGFloat = isCompact ? 12 : 24
@@ -396,7 +396,7 @@ private struct VialPlayerView: View {
             }
             .offset(y: pullDistance)
             .contentShape(Rectangle())
-            .simultaneousGesture(dismissGesture(travel: travel))
+            .gesture(dismissGesture(travel: travel))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
             .environment(\.colorScheme, .dark)
@@ -404,51 +404,48 @@ private struct VialPlayerView: View {
             .accessibilityAction(.escape) { dismiss() }
     }
 
-    private enum PlayerPull {
-        case pending, ignored, vertical(CGFloat)
-
-        var distance: CGFloat {
-            if case let .vertical(distance) = self { return distance }
-            return 0
-        }
-    }
-
-    private func dismissGesture(travel: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 12, coordinateSpace: .global)
-            .updating($pull) { value, state, transaction in
-                guard isPresented, !isAdjustingVolume else {
-                    state = .ignored
+    private func dismissGesture(travel: CGFloat) -> PanGesture {
+        PanGesture(
+            onChange: { value in
+                guard isPresented, !isAdjustingVolume, !isPressingProgress else {
+                    isPullingDown = false
                     return
                 }
                 let movement = value.translation
-                transaction.animation = nil
-                switch state {
-                case .pending:
-                    state = movement.height > abs(movement.width)
-                        ? .vertical(min(movement.height, travel))
-                        : .ignored
-                case .vertical:
-                    state = .vertical(min(max(0, movement.height), travel))
-                case .ignored:
-                    break
+                if isPullingDown == nil {
+                    isPullingDown = movement.height > abs(movement.width)
                 }
-            }
-            .onEnded { value in
-                guard isPresented, !isAdjustingVolume, case .vertical = pull else { return }
-                let distance = value.translation.height
-                let projected = value.predictedEndTranslation.height
-                if distance >= travel * 0.25 || (distance > 24 && projected >= travel * 0.35) {
+                guard isPullingDown == true else { return }
+                offsetY = max(value.translation.height, 0)
+            },
+            onEnd: { value in
+                defer { resetPull() }
+                guard isPresented, !isAdjustingVolume, isPullingDown == true else { return }
+                // AppleMusicStylePlayer's ExpandableNowPlaying dismissal rule (MIT).
+                let translation = max(value.translation.height, 0)
+                let velocity = value.velocity.height / 5
+                if translation + velocity > travel * 0.3 {
                     dismiss()
                 }
-            }
+            },
+            onCancel: { resetPull() }
+        )
+    }
+
+    private func resetPull() {
+        isPullingDown = nil
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.42)) {
+            offsetY = 0
+        }
     }
 
     private var progressControls: some View {
         VStack(spacing: 4) {
-            Capsule()
-                .fill(.white.opacity(0.25))
-                .frame(height: 5)
+            ElasticSlider(value: .constant(0.0), in: 0...1)
+                .sliderStyle(.init(inactiveHeight: 5, growth: 0, maxStretch: 0,
+                                   maximumTrackColor: .white.opacity(0.25)))
                 .frame(maxWidth: .infinity, minHeight: 32)
+                .allowsHitTesting(false)
                 .accessibilityLabel("播放进度不可用")
             HStack {
                 Text("—:—").accessibilityLabel("已播放时长不可用")

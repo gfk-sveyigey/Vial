@@ -6,6 +6,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000000000000000026 /* ElasticSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027; };
+		A10000000000000000000022 /* PanGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023; };
+		A10000000000000000000024 /* AppleMusicStylePlayer-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025; };
 		A10000000000000000000001 /* VialApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* VialApp.swift */; };
 		A10000000000000000000016 /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* Settings.bundle */; };
 		A10000000000000000000018 /* VialHeaderScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* VialHeaderScrollView.swift */; };
@@ -13,6 +16,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A10000000000000000000027 /* ElasticSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/ElasticSlider.swift; sourceTree = "<group>"; };
+		A10000000000000000000023 /* PanGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/PanGesture.swift; sourceTree = "<group>"; };
+		A10000000000000000000025 /* AppleMusicStylePlayer-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = App/AppleMusicStylePlayer-LICENSE.txt; sourceTree = "<group>"; };
 		A10000000000000000000002 /* VialApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/VialApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000004 /* Vial.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vial.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -42,6 +48,9 @@
 				A10000000000000000000002 /* VialApp.swift */,
 				A10000000000000000000019 /* VialHeaderScrollView.swift */,
 				A10000000000000000000021 /* VialHeaderSettings.swift */,
+				A10000000000000000000023 /* PanGesture.swift */,
+				A10000000000000000000027 /* ElasticSlider.swift */,
+				A10000000000000000000025 /* AppleMusicStylePlayer-LICENSE.txt */,
 			);
 			path = Vial;
 			sourceTree = "<group>";
@@ -93,7 +102,7 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A1000000000000000000000C /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000016 /* Settings.bundle in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
+		A1000000000000000000000C /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000016 /* Settings.bundle in Resources */, A10000000000000000000024 /* AppleMusicStylePlayer-LICENSE.txt in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -104,6 +113,8 @@
 				A10000000000000000000001 /* VialApp.swift in Sources */,
 				A10000000000000000000018 /* VialHeaderScrollView.swift in Sources */,
 				A10000000000000000000020 /* VialHeaderSettings.swift in Sources */,
+				A10000000000000000000022 /* PanGesture.swift in Sources */,
+				A10000000000000000000026 /* ElasticSlider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
