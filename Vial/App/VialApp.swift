@@ -199,6 +199,7 @@ private struct VialTabsView: View {
     let preferences: VialNavigationPreferences
     @Binding var selection: VialTab
     @State private var showsPlayer = false
+    @Namespace private var playerTransition
 
     var body: some View {
         TabView(selection: $selection) {
@@ -229,12 +230,12 @@ private struct VialTabsView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityHint("打开播放器")
+            .accessibilityHint("打开全屏播放器")
+            .matchedTransitionSource(id: "miniPlayer", in: playerTransition)
         }
-        .sheet(isPresented: $showsPlayer) {
+        .fullScreenCover(isPresented: $showsPlayer) {
             VialPlayerView()
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+                .navigationTransition(.zoom(sourceID: "miniPlayer", in: playerTransition))
         }
         .onChange(of: preferences.visibleTabs) { _, tabs in
             if !tabs.contains(selection) { selection = tabs.first ?? .search }
@@ -242,7 +243,16 @@ private struct VialTabsView: View {
     }
 }
 
+private struct PlayerGrabberSettings: DynamicProperty {
+    @AppStorage("debug.playerGrabber.topGap") var topGap = 20
+    @AppStorage("debug.playerGrabber.length") var length = 36
+    @AppStorage("debug.playerGrabber.thickness") var thickness = 4
+}
+
 private struct VialPlayerView: View {
+    @Environment(\.dismiss) private var dismiss
+    private var grabberSettings = PlayerGrabberSettings()
+
     var body: some View {
         ContentUnavailableView("未在播放", systemImage: "music.note")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -254,7 +264,33 @@ private struct VialPlayerView: View {
                 )
                 .ignoresSafeArea()
             }
+            .overlay(alignment: .top) {
+                grabber
+            }
             .preferredColorScheme(.dark)
+    }
+
+    private var grabber: some View {
+        Button {
+            dismiss()
+        } label: {
+            Capsule()
+                .fill(.white.opacity(0.85))
+                .frame(width: CGFloat(grabberSettings.length), height: CGFloat(grabberSettings.thickness))
+                .frame(minWidth: 96, minHeight: 44, alignment: .top)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("收起播放器")
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 12).onEnded { value in
+                if value.translation.height > 35 &&
+                    value.translation.height > abs(value.translation.width) {
+                    dismiss()
+                }
+            }
+        )
+        .padding(.top, CGFloat(grabberSettings.topGap))
     }
 }
 
@@ -333,6 +369,7 @@ struct VialActionRow: View {
 }
 
 private struct VialDebugSettingsView: View {
+    private var grabberSettings = PlayerGrabberSettings()
     @ObservedObject private var layout = VialHeaderSettings.shared
     @ObservedObject private var accountRow = VialAccountRowSettings.shared
     @AppStorage("debug.header.lightTint") private var lightTint = "#FFFFFF"
@@ -346,6 +383,14 @@ private struct VialDebugSettingsView: View {
                     UIApplication.shared.open(url)
                 } label: {
                     Label("系统设置", systemImage: "gearshape")
+                }
+            }
+
+            Section {
+                DisclosureGroup("播放器白条") {
+                    Stepper("距顶部安全区 \(grabberSettings.topGap) pt", value: grabberSettings.$topGap, in: 0...80)
+                    Stepper("横向长度 \(grabberSettings.length) pt", value: grabberSettings.$length, in: 12...160)
+                    Stepper("厚度 \(grabberSettings.thickness) pt", value: grabberSettings.$thickness, in: 1...16)
                 }
             }
 
