@@ -12,13 +12,17 @@ struct PanGesture: UIGestureRecognizerRepresentable {
     var onChange: (Value) -> Void
     var onEnd: (Value) -> Void
     var onCancel: () -> Void = {}
+    var isEnabled = true
 
     func makeUIGestureRecognizer(context _: Context) -> UIPanGestureRecognizer {
         let gesture = UIPanGestureRecognizer()
+        gesture.isEnabled = isEnabled
         return gesture
     }
 
-    func updateUIGestureRecognizer(_: UIPanGestureRecognizer, context _: Context) {}
+    func updateUIGestureRecognizer(_ gesture: UIPanGestureRecognizer, context _: Context) {
+        gesture.isEnabled = isEnabled
+    }
 
     func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context _: Context) {
         let state = recognizer.state

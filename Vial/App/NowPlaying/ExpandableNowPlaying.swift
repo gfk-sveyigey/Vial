@@ -88,9 +88,9 @@ struct ExpandableNowPlaying: View {
                     PanGesture(
                         onChange: { handleGestureChange(value: $0, height: full.height) },
                         onEnd: { handleGestureEnd(value: $0, height: full.height) },
-                        onCancel: { setExpanded(expanded) }
-                    ),
-                    including: expanded ? .all : .subviews
+                        onCancel: { setExpanded(expanded) },
+                        isEnabled: expanded
+                    )
                 )
             }
         }
