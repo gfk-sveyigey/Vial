@@ -1,9 +1,22 @@
 .DS_Store
 DerivedData/
 *.xcuserstate
+*.xcuserdatad/
 xcuserdata/
 build/
 __pycache__/
+
+# Xcode build and local workspace artifacts
+*.xcarchive/
+*.dSYM/
+*.dSYM.zip
+*.ipa
+*.xcresult/
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+*.hmap
+.build/
 
 # Local-only helpers
 scripts/

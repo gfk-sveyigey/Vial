@@ -7,6 +7,7 @@ on:
     paths:
       - 'Vial/**'
       - 'Vial.xcodeproj/**'
+      - 'Settings.bundle/**'
       - 'Info.plist'
       - 'VERSION'
   workflow_dispatch:
@@ -59,21 +60,6 @@ jobs:
           }
           plutil -lint Info.plist
 
-      - name: Resolve Swift packages
-        run: |
-          set -e
-          rm -rf build/DerivedData
-          xcodebuild \
-            -resolvePackageDependencies \
-            -project Vial.xcodeproj \
-            -scheme Vial \
-            -derivedDataPath build/DerivedData
-
-          test -f Vial.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved || {
-            echo "::error::Xcode did not produce Package.resolved"
-            exit 1
-          }
-
       - name: Read version
         id: version
         run: |
@@ -102,8 +88,6 @@ jobs:
             -configuration Debug \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build/DerivedData \
-            -onlyUsePackageVersionsFromResolvedFile \
-            -disableAutomaticPackageResolution \
             MARKETING_VERSION='${{ steps.version.outputs.raw }}' \
             CURRENT_PROJECT_VERSION='${{ github.run_number }}' \
             PRODUCT_BUNDLE_IDENTIFIER=com.aholic.vial \
