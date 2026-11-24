@@ -1,7 +1,6 @@
 import SwiftUI
 import UIKit
 import Observation
-import MediaPlayer
 
 @main
 struct VialApp: App {
@@ -192,7 +191,6 @@ private struct VialNavigationShell: View {
 
     var body: some View {
         VialTabsView(preferences: preferences, selection: $selection)
-            .tabBarMinimizeBehavior(preferences.tabBarCanMinimize ? .onScrollDown : .never)
     }
 }
 
@@ -200,10 +198,8 @@ private struct VialTabsView: View {
     let preferences: VialNavigationPreferences
     @Binding var selection: VialTab
     @State private var showsPlayer = false
-    @Namespace private var playerTransition
+    @State private var playerStackProgress: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private var miniArtwork = MiniPlayerArtworkSettings()
-    @ScaledMetric(relativeTo: .subheadline) private var miniPlayerTitleSize: CGFloat = 14
 
     var body: some View {
         TabView(selection: $selection) {
@@ -222,372 +218,27 @@ private struct VialTabsView: View {
                 }
             }
         }
+        .tabBarMinimizeBehavior(preferences.tabBarCanMinimize ? .onScrollDown : .never)
         .tabViewBottomAccessory {
-            HStack(spacing: 8) {
-                Button {
-                    setPlayerPresented(true)
-                } label: {
-                    HStack(alignment: .center, spacing: 0) {
-                        Color.clear
-                            .frame(width: CGFloat(miniArtwork.side), height: CGFloat(miniArtwork.side))
-                            .overlay {
-                                if !showsPlayer {
-                                    PlayerArtworkPlaceholder(
-                                        iconSize: CGFloat(miniArtwork.side) * 15 / 32,
-                                        cornerRadius: CGFloat(miniArtwork.side) * 7 / 32
-                                    )
-                                        .matchedGeometryEffect(id: "playerArtwork", in: playerTransition)
-                                        .transition(.identity)
-                                }
-                            }
-                            .accessibilityHidden(true)
-                            .padding(.leading, CGFloat(miniArtwork.leading))
-                            .padding(.trailing, CGFloat(miniArtwork.trailing))
-                        Text("未在播放")
-                            .font(.system(size: miniPlayerTitleSize, weight: .medium))
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .accessibilityHint("打开全屏播放器")
-
-                Button("播放", systemImage: "play.fill") {}
-                    .frame(minWidth: 44, minHeight: 44)
-                    .disabled(true)
-                Button("下一首", systemImage: "forward.fill") {}
-                    .frame(minWidth: 44, minHeight: 44)
-                    .disabled(true)
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.plain)
-            .padding(.trailing, 12)
+            Color.clear
+                .frame(height: ViewConst.compactNowPlayingHeight)
+                .anchorPreference(key: CompactPlayerAnchor.self, value: .bounds) { $0 }
+                .accessibilityHidden(true)
         }
+        .scaleEffect(reduceMotion ? 1 : 1 - playerStackProgress * 0.1)
+        .offset(y: reduceMotion ? 0 : playerStackProgress * 10)
         .allowsHitTesting(!showsPlayer)
         .accessibilityHidden(showsPlayer)
-        .overlay {
-            VialPlayerView(isPresented: showsPlayer, artworkTransition: playerTransition) {
-                setPlayerPresented(false)
-            }
-            .allowsHitTesting(showsPlayer)
-            .accessibilityHidden(!showsPlayer)
+        .background(Color.black.opacity(playerStackProgress))
+        .overlayPreferenceValue(CompactPlayerAnchor.self) { anchor in
+            ExpandableNowPlaying(
+                expanded: $showsPlayer,
+                stackProgress: $playerStackProgress,
+                compactAnchor: anchor
+            )
         }
         .onChange(of: preferences.visibleTabs) { _, tabs in
             if !tabs.contains(selection) { selection = tabs.first ?? .search }
-        }
-    }
-
-    private func setPlayerPresented(_ presented: Bool) {
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.42)) {
-            showsPlayer = presented
-        }
-    }
-}
-
-private struct MiniPlayerArtworkSettings: DynamicProperty {
-    private static let defaultLeading = 12
-    private static let defaultTrailing = 8
-    private static let defaultSide = 32
-
-    @AppStorage("debug.miniPlayerArtwork.leading") var leading = MiniPlayerArtworkSettings.defaultLeading
-    @AppStorage("debug.miniPlayerArtwork.trailing") var trailing = MiniPlayerArtworkSettings.defaultTrailing
-    @AppStorage("debug.miniPlayerArtwork.side") var side = MiniPlayerArtworkSettings.defaultSide
-
-    func reset() {
-        leading = Self.defaultLeading
-        trailing = Self.defaultTrailing
-        side = Self.defaultSide
-    }
-}
-
-private struct PlayerGrabberSettings: DynamicProperty {
-    private static let defaultTopGap = 7
-    private static let defaultLength = 60
-    private static let defaultThickness = 4
-    private static let defaultColor = "#FFFFFF"
-
-    @AppStorage("debug.playerGrabber.topGap") var topGap = PlayerGrabberSettings.defaultTopGap
-    @AppStorage("debug.playerGrabber.length") var length = PlayerGrabberSettings.defaultLength
-    @AppStorage("debug.playerGrabber.thickness") var thickness = PlayerGrabberSettings.defaultThickness
-    @AppStorage("debug.playerGrabber.color") var color = PlayerGrabberSettings.defaultColor
-    @AppStorage("debug.playerGrabber.opacity") var opacity = 85
-
-    func reset() {
-        topGap = Self.defaultTopGap
-        length = Self.defaultLength
-        thickness = Self.defaultThickness
-        color = Self.defaultColor
-        opacity = 85
-    }
-}
-
-private struct VialPlayerView: View {
-    let isPresented: Bool
-    let artworkTransition: Namespace.ID
-    var dismiss: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var offsetY: CGFloat = 0
-    @State private var isPullingDown: Bool?
-    @State private var isAdjustingVolume = false
-    @GestureState private var isPressingProgress = false
-    private var grabberSettings = PlayerGrabberSettings()
-
-    var body: some View {
-        GeometryReader { viewport in
-            let travel = viewport.size.height + viewport.safeAreaInsets.top + viewport.safeAreaInsets.bottom
-            let pullDistance = isPresented && !reduceMotion ? offsetY : 0
-            let panelOffset = isPresented || reduceMotion ? pullDistance : travel
-            let isCompact = viewport.size.height < 560
-            let spacing: CGFloat = isCompact ? 12 : 24
-            VStack(spacing: 24) {
-                GeometryReader { artwork in
-                    let side = max(0, min(artwork.size.width, artwork.size.height))
-                    if isPresented {
-                        PlayerArtworkPlaceholder(iconSize: min(72, side * 0.35), cornerRadius: 20)
-                            .matchedGeometryEffect(id: "playerArtwork", in: artworkTransition)
-                            .frame(width: side, height: side)
-                            .accessibilityLabel("歌曲封面")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .transition(.identity)
-                    }
-                }
-
-                VStack(spacing: spacing) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("未在播放")
-                            .font(.title2.bold())
-                        progressControls
-                    }
-                    transportControls
-                    volumeControls
-                        .modifier(PlayerControlPressEffect(isPressed: isAdjustingVolume))
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .offset(y: panelOffset - pullDistance)
-                .opacity(isPresented ? 1 : 0)
-            }
-            .frame(maxWidth: 440)
-            .padding(.horizontal, 24)
-            .padding(.top, 48)
-            .padding(.bottom, spacing)
-            .frame(maxWidth: .infinity)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background {
-                LinearGradient(
-                    stops: (0...24).map { index in
-                        let position = Double(index) / 24
-                        let gray = (107 - 43 * position * position) / 255
-                        return Gradient.Stop(
-                            color: Color(red: gray, green: gray, blue: gray),
-                            location: CGFloat(position)
-                        )
-                    },
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                .offset(y: panelOffset - pullDistance)
-                .opacity(reduceMotion && !isPresented ? 0 : 1)
-            }
-            .overlay(alignment: .top) {
-                grabber
-                    .offset(y: panelOffset - pullDistance)
-                    .opacity(isPresented ? 1 : 0)
-            }
-            .offset(y: pullDistance)
-            .contentShape(Rectangle())
-            .gesture(dismissGesture(travel: travel))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .environment(\.colorScheme, .dark)
-            .accessibilityAddTraits(.isModal)
-            .accessibilityAction(.escape) { dismiss() }
-    }
-
-    private func dismissGesture(travel: CGFloat) -> PanGesture {
-        PanGesture(
-            onChange: { value in
-                guard isPresented, !isAdjustingVolume, !isPressingProgress else {
-                    isPullingDown = false
-                    return
-                }
-                let movement = value.translation
-                if isPullingDown == nil {
-                    isPullingDown = movement.height > abs(movement.width)
-                }
-                guard isPullingDown == true else { return }
-                offsetY = max(value.translation.height, 0)
-            },
-            onEnd: { value in
-                defer { resetPull() }
-                guard isPresented, !isAdjustingVolume, isPullingDown == true else { return }
-                // AppleMusicStylePlayer's ExpandableNowPlaying dismissal rule (MIT).
-                let translation = max(value.translation.height, 0)
-                let velocity = value.velocity.height / 5
-                if translation + velocity > travel * 0.3 {
-                    dismiss()
-                }
-            },
-            onCancel: { resetPull() }
-        )
-    }
-
-    private func resetPull() {
-        isPullingDown = nil
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.42)) {
-            offsetY = 0
-        }
-    }
-
-    private var progressControls: some View {
-        VStack(spacing: 4) {
-            ElasticSlider(value: .constant(0.0), in: 0...1)
-                .sliderStyle(.init(inactiveHeight: 5, growth: 0, maxStretch: 0,
-                                   maximumTrackColor: .white.opacity(0.25)))
-                .frame(maxWidth: .infinity, minHeight: 32)
-                .allowsHitTesting(false)
-                .accessibilityLabel("播放进度不可用")
-            HStack {
-                Text("—:—").accessibilityLabel("已播放时长不可用")
-                Spacer()
-                Text("—:—").accessibilityLabel("剩余时长不可用")
-            }
-            .font(.caption.monospacedDigit())
-        }
-        .foregroundStyle(.secondary)
-        .modifier(PlayerControlPressEffect(isPressed: isPressingProgress))
-        .contentShape(Rectangle())
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .updating($isPressingProgress) { _, pressed, _ in
-                    pressed = true
-                }
-        )
-    }
-
-    private var transportControls: some View {
-        HStack(spacing: 24) {
-            Button("上一首", systemImage: "backward.fill") {}
-                .font(.system(size: 28))
-            Button("播放", systemImage: "play.fill") {}
-                .font(.system(size: 44))
-            Button("下一首", systemImage: "forward.fill") {}
-                .font(.system(size: 28))
-        }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.plain)
-        .disabled(true)
-    }
-
-    private var volumeControls: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "speaker.fill")
-                .accessibilityHidden(true)
-            PlayerSystemVolumeSlider(isPressed: $isAdjustingVolume)
-                .frame(maxWidth: .infinity)
-                .frame(height: 32)
-            Image(systemName: "speaker.wave.3.fill")
-                .accessibilityHidden(true)
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-    }
-
-    private var grabber: some View {
-        Button {
-            dismiss()
-        } label: {
-            Capsule()
-                .fill(VialHeaderTint.color(grabberSettings.color).opacity(Double(grabberSettings.opacity) / 100))
-                .frame(width: CGFloat(grabberSettings.length), height: CGFloat(grabberSettings.thickness))
-                .frame(minWidth: 96, minHeight: 44, alignment: .top)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("收起播放器")
-        .padding(.top, CGFloat(grabberSettings.topGap))
-    }
-}
-
-private struct PlayerControlPressEffect: ViewModifier {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let isPressed: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(isPressed && !reduceMotion ? 1.05 : 1)
-            .brightness(isPressed ? 0.16 : 0)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: isPressed)
-    }
-}
-
-private struct PlayerArtworkPlaceholder: View {
-    let iconSize: CGFloat
-    let cornerRadius: CGFloat
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius)
-            .fill(Color(uiColor: .systemGray4))
-            .overlay {
-                Image(systemName: "music.note")
-                    .font(.system(size: iconSize, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-            }
-    }
-}
-
-private struct PlayerSystemVolumeSlider: UIViewRepresentable {
-    @Binding var isPressed: Bool
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(isPressed: $isPressed)
-    }
-
-    func makeUIView(context: Context) -> MPVolumeView {
-        let view = MPVolumeView(frame: .zero)
-        view.showsRouteButton = false
-        view.tintColor = .white
-        let transparentThumb = UIGraphicsImageRenderer(size: CGSize(width: 24, height: 24))
-            .image { _ in }
-        view.setVolumeThumbImage(transparentThumb, for: .normal)
-        view.setVolumeThumbImage(transparentThumb, for: .highlighted)
-
-        if let slider = view.subviews.compactMap({ $0 as? UISlider }).first {
-            slider.minimumTrackTintColor = UIColor(white: 0.78, alpha: 1)
-            slider.maximumTrackTintColor = UIColor(white: 1, alpha: 0.25)
-            let touch = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.adjustVolume(_:)))
-            touch.minimumPressDuration = 0
-            slider.addGestureRecognizer(touch)
-        }
-        return view
-    }
-
-    func updateUIView(_ view: MPVolumeView, context: Context) {}
-
-    final class Coordinator: NSObject {
-        @Binding var isPressed: Bool
-
-        init(isPressed: Binding<Bool>) {
-            _isPressed = isPressed
-        }
-
-        @objc func adjustVolume(_ gesture: UILongPressGestureRecognizer) {
-            guard let slider = gesture.view as? UISlider else { return }
-            switch gesture.state {
-            case .began, .changed:
-                isPressed = true
-                let track = slider.trackRect(forBounds: slider.bounds)
-                guard track.width > 0 else { return }
-                let fraction = min(1, max(0, (gesture.location(in: slider).x - track.minX) / track.width))
-                let position = slider.effectiveUserInterfaceLayoutDirection == .rightToLeft ? 1 - fraction : fraction
-                slider.value = slider.minimumValue + Float(position) * (slider.maximumValue - slider.minimumValue)
-                slider.sendActions(for: .valueChanged)
-            case .ended, .cancelled, .failed:
-                isPressed = false
-            default:
-                break
-            }
         }
     }
 }
