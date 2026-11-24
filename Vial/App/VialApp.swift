@@ -200,7 +200,10 @@ private struct VialTabsView: View {
     let preferences: VialNavigationPreferences
     @Binding var selection: VialTab
     @State private var showsPlayer = false
-    @Namespace private var playerTransition
+    @State private var playerAttached = false
+    @State private var miniPlayerFrame = CGRect.zero
+    @State private var dragOffset: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var miniArtwork = MiniPlayerArtworkSettings()
 
     var body: some View {
@@ -221,42 +224,134 @@ private struct VialTabsView: View {
             }
         }
         .tabViewBottomAccessory {
-            HStack(spacing: 8) {
-                Button {
-                    showsPlayer = true
-                } label: {
-                    HStack(alignment: .center, spacing: 0) {
-                        PlayerArtworkPlaceholder(side: CGFloat(miniArtwork.side))
-                        .accessibilityHidden(true)
-                        .padding(.leading, CGFloat(miniArtwork.leading))
-                        .padding(.trailing, CGFloat(miniArtwork.trailing))
-                        Text("未在播放")
-                            .font(.system(size: 14, weight: .medium))
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
+            miniPlayer
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                    if !playerAttached && !frame.isEmpty { miniPlayerFrame = frame }
                 }
-                .accessibilityHint("打开全屏播放器")
-
-                Button("播放", systemImage: "play.fill") {}
-                    .frame(minWidth: 44, minHeight: 44)
-                    .disabled(true)
-                Button("下一首", systemImage: "forward.fill") {}
-                    .frame(minWidth: 44, minHeight: 44)
-                    .disabled(true)
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.plain)
-            .padding(.trailing, 12)
-            .matchedTransitionSource(id: "miniPlayer", in: playerTransition)
+                .opacity(playerAttached ? 0 : 1)
+                .accessibilityHidden(playerAttached)
         }
-        .fullScreenCover(isPresented: $showsPlayer) {
-            VialPlayerView()
-                .navigationTransition(.zoom(sourceID: "miniPlayer", in: playerTransition))
+        .allowsHitTesting(!playerAttached)
+        .accessibilityHidden(playerAttached)
+        .overlay {
+            if playerAttached {
+                playerOverlay
+                    .transition(.identity)
+                    .task {
+                        await Task.yield()
+                        guard !Task.isCancelled else { return }
+                        withAnimation(playerAnimation) { showsPlayer = true }
+                    }
+            }
         }
         .onChange(of: preferences.visibleTabs) { _, tabs in
             if !tabs.contains(selection) { selection = tabs.first ?? .search }
+        }
+    }
+
+    private var miniPlayer: some View {
+        HStack(spacing: 8) {
+            Button {
+                guard !miniPlayerFrame.isEmpty else { return }
+                playerAttached = true
+            } label: {
+                HStack(alignment: .center, spacing: 0) {
+                    PlayerArtworkPlaceholder(side: CGFloat(miniArtwork.side))
+                        .accessibilityHidden(true)
+                        .padding(.leading, CGFloat(miniArtwork.leading))
+                        .padding(.trailing, CGFloat(miniArtwork.trailing))
+                    Text("未在播放")
+                        .font(.system(size: 14, weight: .medium))
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .accessibilityHint("打开全屏播放器")
+
+            Button("播放", systemImage: "play.fill") {}
+                .frame(minWidth: 44, minHeight: 44)
+                .disabled(true)
+            Button("下一首", systemImage: "forward.fill") {}
+                .frame(minWidth: 44, minHeight: 44)
+                .disabled(true)
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.plain)
+        .padding(.trailing, 12)
+    }
+
+    private var playerAnimation: Animation? {
+        reduceMotion ? nil : .smooth(duration: 0.35)
+    }
+
+    private var playerOverlay: some View {
+        GeometryReader { viewport in
+            let origin = viewport.frame(in: .global).origin
+            let insets = viewport.safeAreaInsets
+            let full = CGRect(
+                x: -insets.leading, y: -insets.top,
+                width: viewport.size.width + insets.leading + insets.trailing,
+                height: viewport.size.height + insets.top + insets.bottom
+            )
+            let compact = miniPlayerFrame.offsetBy(dx: -origin.x, dy: -origin.y)
+            let panel = showsPlayer ? full : compact
+            let scale = min(panel.width / max(1, full.width), panel.height / max(1, full.height))
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: showsPlayer ? 0 : compact.height / 2)
+                    .fill(.regularMaterial)
+                    .frame(width: panel.width, height: panel.height)
+                    .position(x: panel.midX, y: panel.midY)
+
+                VialPlayerView(
+                    dismiss: closePlayer,
+                    onDrag: { if showsPlayer && !reduceMotion { dragOffset = $0 } },
+                    onDragEnd: { distance in
+                        guard showsPlayer else { return }
+                        if distance > full.height / 2 {
+                            closePlayer()
+                        } else {
+                            withAnimation(playerAnimation) { dragOffset = 0 }
+                        }
+                    }
+                )
+                .frame(width: viewport.size.width, height: viewport.size.height)
+                .environment(\.colorScheme, .dark)
+                .scaleEffect(scale)
+                .offset(x: panel.midX - full.midX, y: panel.midY - full.midY)
+                .mask(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: showsPlayer ? 0 : compact.height / 2)
+                        .frame(width: panel.width, height: panel.height)
+                        .offset(x: panel.minX, y: panel.minY)
+                }
+                .opacity(showsPlayer ? 1 : 0)
+                .allowsHitTesting(showsPlayer)
+                .accessibilityHidden(!showsPlayer)
+
+                miniPlayer
+                    .frame(width: compact.width, height: compact.height)
+                    .position(x: compact.midX, y: compact.midY)
+                    .opacity(showsPlayer ? 0 : 1)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+            .frame(width: viewport.size.width, height: viewport.size.height)
+            .offset(y: dragOffset)
+            .accessibilityAddTraits(.isModal)
+            .accessibilityAction(.escape, closePlayer)
+        }
+    }
+
+    private func closePlayer() {
+        guard showsPlayer else { return }
+        withAnimation(playerAnimation, completionCriteria: .removed) {
+            showsPlayer = false
+            dragOffset = 0
+        } completion: {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { playerAttached = false }
         }
     }
 }
@@ -299,9 +394,12 @@ private struct PlayerGrabberSettings: DynamicProperty {
 }
 
 private struct VialPlayerView: View {
-    @Environment(\.dismiss) private var dismiss
+    let dismiss: () -> Void
+    let onDrag: (CGFloat) -> Void
+    let onDragEnd: (CGFloat) -> Void
     @State private var isAdjustingVolume = false
     @GestureState private var isPressingProgress = false
+    @GestureState private var isDragging = false
     private var grabberSettings = PlayerGrabberSettings()
 
     var body: some View {
@@ -351,8 +449,27 @@ private struct VialPlayerView: View {
             }
             .overlay(alignment: .top) { grabber }
         }
-            .preferredColorScheme(.dark)
-            .accessibilityAddTraits(.isModal)
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 12, coordinateSpace: .global)
+                .updating($isDragging) { _, active, _ in active = true }
+                .onChanged { value in
+                    guard !isAdjustingVolume, !isPressingProgress,
+                          value.translation.height > abs(value.translation.width) else { return }
+                    onDrag(value.translation.height)
+                }
+                .onEnded { value in
+                    guard !isAdjustingVolume, !isPressingProgress,
+                          value.translation.height > abs(value.translation.width) else {
+                        onDragEnd(0)
+                        return
+                    }
+                    onDragEnd(max(value.translation.height, value.predictedEndTranslation.height))
+                }
+        )
+        .onChange(of: isDragging) { _, active in
+            if !active { onDragEnd(0) }
+        }
     }
 
     private var progressControls: some View {
