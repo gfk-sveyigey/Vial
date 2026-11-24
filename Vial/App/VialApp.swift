@@ -200,10 +200,6 @@ private struct VialTabsView: View {
     let preferences: VialNavigationPreferences
     @Binding var selection: VialTab
     @State private var showsPlayer = false
-    @State private var playerAttached = false
-    @State private var miniPlayerFrame = CGRect.zero
-    @GestureState private var playerDrag: CGFloat = 0
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var playerTransition
     private var miniArtwork = MiniPlayerArtworkSettings()
 
@@ -225,172 +221,42 @@ private struct VialTabsView: View {
             }
         }
         .tabViewBottomAccessory {
-            miniPlayer(namespace: nil)
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
-                    if !playerAttached && !frame.isEmpty { miniPlayerFrame = frame }
-                }
-                .opacity(playerAttached ? 0 : 1)
-                .allowsHitTesting(!playerAttached)
-                .accessibilityHidden(playerAttached)
-        }
-        .allowsHitTesting(!playerAttached)
-        .accessibilityHidden(playerAttached)
-        .overlay {
-            if playerAttached {
-                playerOverlay
-                    .transition(.identity)
-                    .task {
-                        await Task.yield()
-                        guard !Task.isCancelled else { return }
-                        withAnimation(playerAnimation) { showsPlayer = true }
+            HStack(spacing: 8) {
+                Button {
+                    showsPlayer = true
+                } label: {
+                    HStack(alignment: .center, spacing: 0) {
+                        PlayerArtworkPlaceholder(side: CGFloat(miniArtwork.side))
+                        .accessibilityHidden(true)
+                        .padding(.leading, CGFloat(miniArtwork.leading))
+                        .padding(.trailing, CGFloat(miniArtwork.trailing))
+                        Text("未在播放")
+                            .font(.system(size: 14, weight: .medium))
+                            .lineLimit(1)
                     }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .accessibilityHint("打开全屏播放器")
+
+                Button("播放", systemImage: "play.fill") {}
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(true)
+                Button("下一首", systemImage: "forward.fill") {}
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(true)
             }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.plain)
+            .padding(.trailing, 12)
+            .matchedTransitionSource(id: "miniPlayer", in: playerTransition)
+        }
+        .fullScreenCover(isPresented: $showsPlayer) {
+            VialPlayerView()
+                .navigationTransition(.zoom(sourceID: "miniPlayer", in: playerTransition))
         }
         .onChange(of: preferences.visibleTabs) { _, tabs in
             if !tabs.contains(selection) { selection = tabs.first ?? .search }
-        }
-    }
-
-    private func miniPlayer(namespace: Namespace.ID?) -> some View {
-        HStack(spacing: 8) {
-            Button {
-                openPlayer()
-            } label: {
-                HStack(alignment: .center, spacing: 0) {
-                    PlayerArtworkPlaceholder(
-                        iconSize: CGFloat(miniArtwork.side) * 15 / 32,
-                        cornerRadius: CGFloat(miniArtwork.side) * 7 / 32
-                    )
-                    .modifier(PlayerArtworkMatch(namespace: namespace))
-                    .frame(width: CGFloat(miniArtwork.side), height: CGFloat(miniArtwork.side))
-                    .accessibilityHidden(true)
-                    .padding(.leading, CGFloat(miniArtwork.leading))
-                    .padding(.trailing, CGFloat(miniArtwork.trailing))
-                    Text("未在播放")
-                        .font(.system(size: 14, weight: .medium))
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .accessibilityHint("打开全屏播放器")
-
-            Button("播放", systemImage: "play.fill") {}
-                .frame(minWidth: 44, minHeight: 44)
-                .disabled(true)
-            Button("下一首", systemImage: "forward.fill") {}
-                .frame(minWidth: 44, minHeight: 44)
-                .disabled(true)
-        }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.plain)
-        .padding(.trailing, 12)
-    }
-
-    private var playerAnimation: Animation? {
-        reduceMotion ? nil : .interpolatingSpring(duration: 0.3, bounce: 0, initialVelocity: 0)
-    }
-
-    private var playerOverlay: some View {
-        GeometryReader { viewport in
-            let origin = viewport.frame(in: .global).origin
-            let compact = miniPlayerFrame.offsetBy(dx: -origin.x, dy: -origin.y)
-            let insets = viewport.safeAreaInsets
-            let full = CGRect(
-                x: -insets.leading,
-                y: -insets.top,
-                width: viewport.size.width + insets.leading + insets.trailing,
-                height: viewport.size.height + insets.top + insets.bottom
-            )
-            let panel = showsPlayer ? full : compact
-            let shape = ConcentricRectangle(
-                corners: .concentric(minimum: .fixed(compact.height / 2)),
-                isUniform: true
-            )
-
-            ZStack(alignment: .topLeading) {
-                LinearGradient(
-                    stops: (0...24).map { index in
-                        let position = Double(index) / 24
-                        let gray = (107 - 43 * position * position) / 255
-                        return Gradient.Stop(
-                            color: Color(red: gray, green: gray, blue: gray),
-                            location: CGFloat(position)
-                        )
-                    },
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .opacity(showsPlayer ? 1 : 0)
-
-                if showsPlayer {
-                    VialPlayerView(
-                        artworkNamespace: reduceMotion ? nil : playerTransition,
-                        dismiss: closePlayer
-                    )
-                        .frame(width: viewport.size.width, height: viewport.size.height)
-                        .offset(x: insets.leading, y: insets.top)
-                        .environment(\.colorScheme, .dark)
-                        .geometryGroup()
-                        .transition(.identity)
-                } else {
-                    miniPlayer(namespace: reduceMotion ? nil : playerTransition)
-                        .frame(width: compact.width, height: compact.height)
-                        .geometryGroup()
-                        .transition(.opacity)
-                }
-            }
-            .frame(width: panel.width, height: panel.height, alignment: .topLeading)
-            .clipShape(shape)
-            .glassEffect(.regular, in: shape)
-            .position(x: panel.midX, y: panel.midY + (showsPlayer && !reduceMotion ? playerDrag : 0))
-            .animation(playerAnimation, value: playerDrag == 0)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 12, coordinateSpace: .global)
-                    .updating($playerDrag) { value, offset, transaction in
-                        guard showsPlayer, value.startLocation.y < viewport.frame(in: .global).midY,
-                              value.translation.height > abs(value.translation.width) else { return }
-                        transaction.disablesAnimations = true
-                        offset = value.translation.height
-                    }
-                    .onEnded { value in
-                        guard showsPlayer, value.startLocation.y < viewport.frame(in: .global).midY,
-                              value.translation.height > abs(value.translation.width),
-                              value.predictedEndTranslation.height > full.height / 2 else { return }
-                        closePlayer()
-                    }
-            )
-            .frame(width: viewport.size.width, height: viewport.size.height)
-            .accessibilityAddTraits(.isModal)
-            .accessibilityAction(.escape, closePlayer)
-        }
-    }
-
-    private func openPlayer() {
-        guard !playerAttached, !miniPlayerFrame.isEmpty else { return }
-        playerAttached = true
-    }
-
-    private func closePlayer() {
-        guard showsPlayer else { return }
-        withAnimation(playerAnimation, completionCriteria: .removed) {
-            showsPlayer = false
-        } completion: {
-            var transaction = Transaction(animation: nil)
-            transaction.disablesAnimations = true
-            withTransaction(transaction) { playerAttached = false }
-        }
-    }
-}
-
-private struct PlayerArtworkMatch: ViewModifier {
-    let namespace: Namespace.ID?
-
-    func body(content: Content) -> some View {
-        if let namespace {
-            content.matchedGeometryEffect(id: "playerArtwork", in: namespace)
-        } else {
-            content
         }
     }
 }
@@ -433,10 +299,12 @@ private struct PlayerGrabberSettings: DynamicProperty {
 }
 
 private struct VialPlayerView: View {
-    let artworkNamespace: Namespace.ID?
-    let dismiss: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAdjustingVolume = false
     @GestureState private var isPressingProgress = false
+    @GestureState(resetTransaction: Transaction(animation: .interpolatingSpring(duration: 0.3, bounce: 0)))
+    private var pullOffset: CGFloat = 0
     private var grabberSettings = PlayerGrabberSettings()
 
     var body: some View {
@@ -446,9 +314,7 @@ private struct VialPlayerView: View {
             VStack(spacing: 24) {
                 GeometryReader { artwork in
                     let side = max(0, min(artwork.size.width, artwork.size.height))
-                    PlayerArtworkPlaceholder(iconSize: min(72, side * 0.35), cornerRadius: 20)
-                        .modifier(PlayerArtworkMatch(namespace: artworkNamespace))
-                        .frame(width: side, height: side)
+                    PlayerArtworkPlaceholder(side: side)
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("歌曲封面")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -465,17 +331,53 @@ private struct VialPlayerView: View {
                         .modifier(PlayerControlPressEffect(isPressed: isAdjustingVolume))
                 }
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 440)
+                .padding(.horizontal, 24)
+                .padding(.bottom, spacing)
             }
-            .frame(maxWidth: 440)
-            .padding(.horizontal, 24)
-            .padding(.top, 48)
-            .padding(.bottom, spacing)
             .frame(maxWidth: .infinity)
             .frame(maxHeight: .infinity)
+            .background {
+                LinearGradient(
+                    stops: (0...24).map { index in
+                        let position = Double(index) / 24
+                        let gray = (107 - 43 * position * position) / 255
+                        return Gradient.Stop(
+                            color: Color(red: gray, green: gray, blue: gray),
+                            location: CGFloat(position)
+                        )
+                    },
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            }
             .overlay(alignment: .top) { grabber }
-        }
-            .accessibilityAddTraits(.isModal)
             .contentShape(Rectangle())
+            .offset(y: reduceMotion ? 0 : pullOffset)
+            .simultaneousGesture(dismissDrag(height: viewport.size.height + viewport.safeAreaInsets.top + viewport.safeAreaInsets.bottom))
+        }
+            .preferredColorScheme(.dark)
+            .accessibilityAddTraits(.isModal)
+    }
+
+    private func dismissDrag(height: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .global)
+            .updating($pullOffset) { value, offset, transaction in
+                guard !reduceMotion, canPullDown(value) else { return }
+                transaction.animation = nil
+                offset = value.translation.height
+            }
+            .onEnded { value in
+                guard height > 0, canPullDown(value) else { return }
+                let projectedDistance = max(value.translation.height, value.predictedEndTranslation.height)
+                if projectedDistance > height / 2 { dismiss() }
+            }
+    }
+
+    private func canPullDown(_ value: DragGesture.Value) -> Bool {
+        !isAdjustingVolume && !isPressingProgress &&
+            value.translation.height > abs(value.translation.width)
     }
 
     private var progressControls: some View {
@@ -560,18 +462,18 @@ private struct PlayerControlPressEffect: ViewModifier {
 }
 
 private struct PlayerArtworkPlaceholder: View {
-    let iconSize: CGFloat
-    let cornerRadius: CGFloat
+    let side: CGFloat
 
     var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius)
+        RoundedRectangle(cornerRadius: side * 7 / 32)
             .fill(Color(uiColor: .systemGray4))
             .overlay {
                 Image(systemName: "music.note")
-                    .font(.system(size: iconSize, weight: .medium))
+                    .font(.system(size: max(1, side * 15 / 32), weight: .medium))
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
             }
+            .frame(width: side, height: side)
     }
 }
 
