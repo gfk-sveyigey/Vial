@@ -200,10 +200,7 @@ private struct VialTabsView: View {
     let preferences: VialNavigationPreferences
     @Binding var selection: VialTab
     @State private var showsPlayer = false
-    @State private var playerAttached = false
-    @State private var miniPlayerFrame = CGRect.zero
-    @State private var dragOffset: CGFloat = 0
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var playerTransition
     private var miniArtwork = MiniPlayerArtworkSettings()
 
     var body: some View {
@@ -224,203 +221,42 @@ private struct VialTabsView: View {
             }
         }
         .tabViewBottomAccessory {
-            miniPlayer
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
-                    if !playerAttached && !frame.isEmpty { miniPlayerFrame = frame }
-                }
-                .opacity(playerAttached ? 0 : 1)
-                .accessibilityHidden(playerAttached)
-        }
-        .allowsHitTesting(!playerAttached)
-        .accessibilityHidden(playerAttached)
-        .background {
-            PlayerPresentationBridge(isPresented: $playerAttached) {
-                playerOverlay
-                    .task {
-                        await Task.yield()
-                        guard !Task.isCancelled else { return }
-                        withAnimation(playerAnimation) { showsPlayer = true }
-                    }
-            }
-            .frame(width: 0, height: 0)
-            .accessibilityHidden(true)
-        }
-        .onChange(of: preferences.visibleTabs) { _, tabs in
-            if !tabs.contains(selection) { selection = tabs.first ?? .search }
-        }
-    }
-
-    private var miniPlayer: some View {
-        HStack(spacing: 8) {
-            Button {
-                guard !miniPlayerFrame.isEmpty else { return }
-                playerAttached = true
-            } label: {
-                HStack(alignment: .center, spacing: 0) {
-                    PlayerArtworkPlaceholder(side: CGFloat(miniArtwork.side))
+            HStack(spacing: 8) {
+                Button {
+                    showsPlayer = true
+                } label: {
+                    HStack(alignment: .center, spacing: 0) {
+                        PlayerArtworkPlaceholder(side: CGFloat(miniArtwork.side))
                         .accessibilityHidden(true)
                         .padding(.leading, CGFloat(miniArtwork.leading))
                         .padding(.trailing, CGFloat(miniArtwork.trailing))
-                    Text("未在播放")
-                        .font(.system(size: 14, weight: .medium))
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .accessibilityHint("打开全屏播放器")
-
-            Button("播放", systemImage: "play.fill") {}
-                .frame(minWidth: 44, minHeight: 44)
-                .disabled(true)
-            Button("下一首", systemImage: "forward.fill") {}
-                .frame(minWidth: 44, minHeight: 44)
-                .disabled(true)
-        }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.plain)
-        .padding(.trailing, 12)
-    }
-
-    private var playerAnimation: Animation? {
-        reduceMotion ? nil : .smooth(duration: 0.35)
-    }
-
-    private var playerOverlay: some View {
-        GeometryReader { viewport in
-            let origin = viewport.frame(in: .global).origin
-            let insets = viewport.safeAreaInsets
-            let full = CGRect(
-                x: -insets.leading, y: -insets.top,
-                width: viewport.size.width + insets.leading + insets.trailing,
-                height: viewport.size.height + insets.top + insets.bottom
-            )
-            let compact = miniPlayerFrame.offsetBy(dx: -origin.x, dy: -origin.y)
-            let panel = showsPlayer ? full : compact
-            let scale = min(panel.width / max(1, full.width), panel.height / max(1, full.height))
-
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: showsPlayer ? 0 : compact.height / 2)
-                    .fill(.regularMaterial)
-                    .frame(width: panel.width, height: panel.height)
-                    .position(x: panel.midX, y: panel.midY)
-
-                VialPlayerView(
-                    dismiss: closePlayer,
-                    onDrag: { if showsPlayer && !reduceMotion { dragOffset = $0 } },
-                    onDragEnd: { distance in
-                        guard showsPlayer else { return }
-                        if distance > full.height / 2 {
-                            closePlayer()
-                        } else {
-                            withAnimation(playerAnimation) { dragOffset = 0 }
-                        }
+                        Text("未在播放")
+                            .font(.system(size: 14, weight: .medium))
+                            .lineLimit(1)
                     }
-                )
-                .frame(width: viewport.size.width, height: viewport.size.height)
-                .environment(\.colorScheme, .dark)
-                .scaleEffect(scale)
-                .offset(x: panel.midX - full.midX, y: panel.midY - full.midY)
-                .mask(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: showsPlayer ? 0 : compact.height / 2)
-                        .frame(width: panel.width, height: panel.height)
-                        .offset(x: panel.minX, y: panel.minY)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-                .opacity(showsPlayer ? 1 : 0)
-                .allowsHitTesting(showsPlayer)
-                .accessibilityHidden(!showsPlayer)
+                .accessibilityHint("打开全屏播放器")
 
-                miniPlayer
-                    .frame(width: compact.width, height: compact.height)
-                    .position(x: compact.midX, y: compact.midY)
-                    .opacity(showsPlayer ? 0 : 1)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
+                Button("播放", systemImage: "play.fill") {}
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(true)
+                Button("下一首", systemImage: "forward.fill") {}
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(true)
             }
-            .frame(width: viewport.size.width, height: viewport.size.height)
-            .offset(y: dragOffset)
-            .accessibilityAddTraits(.isModal)
-            .accessibilityAction(.escape, closePlayer)
+            .labelStyle(.iconOnly)
+            .buttonStyle(.plain)
+            .padding(.trailing, 12)
+            .matchedTransitionSource(id: "miniPlayer", in: playerTransition)
         }
-    }
-
-    private func closePlayer() {
-        guard showsPlayer else { return }
-        withAnimation(playerAnimation, completionCriteria: .removed) {
-            showsPlayer = false
-            dragOffset = 0
-        } completion: {
-            var transaction = Transaction(animation: nil)
-            transaction.disablesAnimations = true
-            withTransaction(transaction) { playerAttached = false }
+        .fullScreenCover(isPresented: $showsPlayer) {
+            VialPlayerView()
+                .navigationTransition(.zoom(sourceID: "miniPlayer", in: playerTransition))
         }
-    }
-}
-
-private struct PlayerPresentationBridge<Content: View>: UIViewControllerRepresentable {
-    @Binding var isPresented: Bool
-    @ViewBuilder var content: () -> Content
-
-    func makeUIViewController(context: Context) -> Presenter {
-        Presenter()
-    }
-
-    func updateUIViewController(_ presenter: Presenter, context: Context) {
-        presenter.requested = isPresented
-        if isPresented {
-            presenter.pendingContent = content()
-            presenter.onPresentationUnavailable = { isPresented = false }
-        }
-        presenter.scheduleUpdate()
-    }
-
-    final class Presenter: UIViewController {
-        var requested = false
-        var pendingContent: Content?
-        var onPresentationUnavailable: (() -> Void)?
-        private var host: UIHostingController<Content>?
-        private var updateScheduled = false
-
-        override func viewDidAppear(_ animated: Bool) {
-            super.viewDidAppear(animated)
-            scheduleUpdate()
-        }
-
-        func scheduleUpdate() {
-            guard !updateScheduled else { return }
-            updateScheduled = true
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                updateScheduled = false
-                updatePresentation()
-            }
-        }
-
-        private func updatePresentation() {
-            guard requested else {
-                host?.dismiss(animated: false)
-                host = nil
-                pendingContent = nil
-                onPresentationUnavailable = nil
-                return
-            }
-            guard let content = pendingContent else { return }
-            if let host {
-                host.rootView = content
-                return
-            }
-            guard let window = viewIfLoaded?.window,
-                  let root = window.rootViewController else { return }
-            guard root.presentedViewController == nil else {
-                onPresentationUnavailable?()
-                return
-            }
-            let host = UIHostingController(rootView: content)
-            host.modalPresentationStyle = .overFullScreen
-            host.view.backgroundColor = .clear
-            host.view.accessibilityViewIsModal = true
-            self.host = host
-            root.present(host, animated: false)
+        .onChange(of: preferences.visibleTabs) { _, tabs in
+            if !tabs.contains(selection) { selection = tabs.first ?? .search }
         }
     }
 }
@@ -463,12 +299,9 @@ private struct PlayerGrabberSettings: DynamicProperty {
 }
 
 private struct VialPlayerView: View {
-    let dismiss: () -> Void
-    let onDrag: (CGFloat) -> Void
-    let onDragEnd: (CGFloat) -> Void
+    @Environment(\.dismiss) private var dismiss
     @State private var isAdjustingVolume = false
     @GestureState private var isPressingProgress = false
-    @GestureState private var isDragging = false
     private var grabberSettings = PlayerGrabberSettings()
 
     var body: some View {
@@ -518,27 +351,8 @@ private struct VialPlayerView: View {
             }
             .overlay(alignment: .top) { grabber }
         }
-        .contentShape(Rectangle())
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 12, coordinateSpace: .global)
-                .updating($isDragging) { _, active, _ in active = true }
-                .onChanged { value in
-                    guard !isAdjustingVolume, !isPressingProgress,
-                          value.translation.height > abs(value.translation.width) else { return }
-                    onDrag(value.translation.height)
-                }
-                .onEnded { value in
-                    guard !isAdjustingVolume, !isPressingProgress,
-                          value.translation.height > abs(value.translation.width) else {
-                        onDragEnd(0)
-                        return
-                    }
-                    onDragEnd(max(value.translation.height, value.predictedEndTranslation.height))
-                }
-        )
-        .onChange(of: isDragging) { _, active in
-            if !active { onDragEnd(0) }
-        }
+            .preferredColorScheme(.dark)
+            .accessibilityAddTraits(.isModal)
     }
 
     private var progressControls: some View {
